@@ -6,8 +6,9 @@ Coupling scheme (one-way, unresolved):
     prescribed at the distributor; the interstitial velocity in each cell is u_g = U_g / ε_g.
   * The particle-phase drag term (paper Eq. 3) is F_d = β (u_g − v_p) V_p / ε_s.
   * The fluid-phase reaction term S_p (paper Eq. 2) is not implemented.
-  * Voidage and β are recomputed every DEM step → fluid : DEM timestep ratio = 1 : 1
-    (the paper's 5 : 1 arises from their coupled Navier–Stokes solve).
+  * The voidage field is refreshed every `nfluid` DEM steps (default 1 → fluid : DEM
+    ratio 1 : 1; 5 mimics the paper's 5 : 1, which arises from their coupled
+    Navier–Stokes solve). β and the drag are evaluated every DEM step from that field.
 
 Voidage uses the 2-D monolayer slab convention: cell volume = Δx Δy d_p, particle
 volume = π d_p³ / 6, so a close-packed 2-D layer gives ε_g ≈ 0.46 (physical) rather

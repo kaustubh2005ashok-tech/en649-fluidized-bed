@@ -25,7 +25,7 @@ en649_fluidized_bed/
 ├── run_sweep.py     (e_n, μ, seed) sensitivity sweep, multiprocessing
 ├── animate.py       three-panel GIF (illustration only)
 ├── requirements.txt
-└── out/             all outputs (gitignored)
+└── out/             all outputs (tracked, so the repo mirrors the working folder)
 ```
 
 Every physical number lives in `params.py`. Nothing else hard-codes a value.
@@ -59,8 +59,12 @@ python analysis.py   --tag demo
 
 # 3. full bed, paper protocol (≈3,380 particles, 0.23 m, 0.2 m/s² ramp)  — run overnight
 python run_settle.py
-python run_ramp.py                                          # ~2–3 h
+python run_ramp.py                                          # ~3.5 h, prints % complete + ETA
 python analysis.py
+
+# 3b. same bed with the paper's 5:1 fluid:DEM update ratio (voidage refreshed every 5 DEM steps)
+python run_ramp.py --nfluid 5 --out_tag full_5to1           # ~3.3 h, saves out/ramp_full_5to1.npz
+python analysis.py --tag full_5to1
 
 # 4. sensitivity (9 cases, 6 workers)
 python run_sweep.py                       # demo bed, fast ramp
@@ -106,10 +110,13 @@ so that ΔP/L = β(u_g − u_s); the Ergun branch therefore carries ε² and ε�
 denominators. Particle-phase term: F_d = β(u_g − v_p)V_p/ε_s (paper Eq. 3).
 
 **Coupling scheme** — one-way, unresolved. U_g is prescribed at the distributor and
-u_g = U_g/ε_g per cell. Voidage and β are recomputed every DEM step, so the
-fluid : DEM update ratio is **1 : 1**. The gas momentum equation and its reaction term
-S_p (paper Eq. 2) are **not** solved; the paper's 5 : 1 ratio comes from their coupled
-Navier–Stokes solve, which this code does not have.
+u_g = U_g/ε_g per cell. The voidage field (the "fluid update") is refreshed every
+`nfluid` DEM steps (`Params.nfluid`, `--nfluid` on `run_ramp.py`); the drag on each
+particle is applied every DEM step from the latest field and the particle's current
+velocity. `nfluid = 1` (default) is the original **1 : 1** scheme; `nfluid = 5` mimics
+the paper's **5 : 1** ratio. The gas momentum equation and its reaction term S_p
+(paper Eq. 2) are **not** solved; the paper's 5 : 1 ratio comes from their coupled
+Navier–Stokes solve, so here it only staggers the voidage update.
 
 **u_mf extraction** — descending branch only (the ascending branch carries the
 overshoot spike). Fixed-bed region fitted to a U + b U² (Ergun form — these particles
@@ -137,6 +144,27 @@ u_mf ∝ ε^{3/2} in this regime, so a 2-D bed at ε ≈ 0.46–0.48 sits 10–2
 The 1 m/s² ramp is 5× faster than the paper's and the descending branch is noisy; the
 fit lands close to experiment partly by luck. The quantitative result is the full bed
 at 0.2 m/s², and the honest comparison is against Ergun at the measured ε_mf.
+
+---
+
+## Full-bed results (paper protocol: N = 3,380, W = 0.23 m, 0.2 m/s² ramp to 2.2 m/s)
+
+Same settled bed (ε_mf = 0.441) for both cases. Files: `out/*_full.*` and `out/*_full_5to1.*`.
+
+| | 1 : 1 (`nfluid=1`) | 5 : 1 (`nfluid=5`) |
+|---|---|---|
+| plateau ΔP vs N m g/(W d_p) | 99.9 % | 97.5 % |
+| u_mf (descending fit) | **0.989 m/s** | **1.005 m/s** |
+| vs Ergun at ε_mf (1.104 m/s) | −10.5 % | −9.0 % |
+| vs paper simulation (1.00 m/s) | −1.1 % | +0.5 % |
+| vs NETL experiment (1.05 m/s) | −5.9 % | −4.3 % |
+| wall-clock | 206 min | 200 min |
+
+Each is a single run, so the 1.6 % difference between the two cases is not shown to be
+significant; run `run_sweep.py --seeds 3` for run-to-run scatter.
+
+Animations (`out/fluidized_bed_demo.gif`, `out/fluidized_bed_full.gif`, from
+`animate.py`) are illustrations at a much faster ramp than the paper's.
 
 ---
 
