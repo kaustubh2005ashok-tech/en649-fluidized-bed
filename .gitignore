@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+out/
+*.npz
+*.gif
+*.log
