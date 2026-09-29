@@ -1,0 +1,3 @@
+tag=demo N=624 en=0.84 mu=0.35 seed=7
+eps_mf=0.4806 dP_theory=427.0 plateau=413.5
+umf_sim=1.0701 umf_ergun=1.2773 umf_expt=1.05
