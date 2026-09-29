@@ -142,7 +142,7 @@ def ramp(state, p, args, verbose=True):
     n_up = int(round(t_up / dt_s))
     t, Ugs, dPs, br, hs = [], [], [], [], []
     tt = 0.0
-    last_pct = -1
+    last_pct = 0
     t_start = time.time()
     for k in range(2 * n_up):
         if k < n_up:
