@@ -168,6 +168,27 @@ Animations (`out/fluidized_bed_demo.gif`, `out/fluidized_bed_full.gif`, from
 
 ---
 
+## Deviations from the project proposal
+
+The revised proposal (EN649_Proposal_Revised.pdf) specifies the method below. Differences
+in the code, and why:
+
+| Item | Proposal | This code | Reason |
+|---|---|---|---|
+| DEM timestep | 2×10⁻⁵ s (≈ t_c/8, as in the paper) | 3.3 µs (t_c/50) | symplectic Euler needs the tighter step |
+| Domain height | 0.40 m | 0.55 m | `params.py` default `H`; the ceiling is a hard wall, not a pressure outlet |
+| Particle count | ≈ 3,700 | 3,380 (52 rows × 65 cols) | `params.py` default `nrow = 52` |
+| Static bed height | ≈ 0.167 m | 0.146 m | settled 2-D monolayer packing, ε_mf = 0.441 |
+| Ergun reference | 1.02 m/s at ε_mf = 0.42 | 1.104 m/s at the measured ε_mf = 0.441 | u_mf ∝ ε^{3/2}; the 2-D bed packs looser |
+| Fluid time step | 10⁻⁴ s in the paper (Appendix A.2) | 1 : 1 with the DEM step, or 5 : 1 via `--nfluid 5` (16.6 µs) | no gas momentum solve here; 5 : 1 only staggers the voidage update |
+| Gas phase | one-dimensional, unresolved, prescribed U_g | as proposed | — |
+| Cross-check | LIGGGHTS "if time permits" | not done | — |
+
+Not in the proposal but implemented: an `--nfluid` option, a live percentage/ETA display
+in `run_ramp.py`, and a demo-bed pipeline for development.
+
+---
+
 ## Known limitations (state these in the report)
 
 1. **2-D monolayer** — no front/back walls, looser packing than 3-D; shifts u_mf up
