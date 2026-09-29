@@ -49,6 +49,7 @@ class Params:
     # ---------------- drag ----------------
     eps_switch: float = 0.8    # Gidaspow branch switch
     eps_min: float = 0.36      # voidage clamp (random close packing)
+    nfluid: int = 1            # DEM steps per fluid (voidage) update; 1 = every step, 5 = paper's 5:1
 
     # ---------------- ramp protocol (paper §4.2) ----------------
     ramp_rate: float = 0.2     # m/s^2
@@ -115,7 +116,7 @@ class Params:
                 self.W, self.H, self.NCX, self.NCY, self.dx, self.dy,
                 self.dp, self.rho_g, self.mu_g, self.Vp, self.ap,
                 self.eps_switch, self.eps_min,
-                ncell, head, nxt, self.dx, self.dy)
+                ncell, head, nxt, self.dx, self.dy, self.nfluid)
 
     def dP_theory(self, N: int) -> float:
         """Bed weight per unit (monolayer) cross-section: N m g / (W d_p)."""

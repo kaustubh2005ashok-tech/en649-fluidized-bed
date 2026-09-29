@@ -22,12 +22,17 @@ def main():
     ap.add_argument("--tag", default="full")
     ap.add_argument("--Ug_max", type=float, default=None)
     ap.add_argument("--rate", type=float, default=None, help="ramp rate m/s^2 (paper: 0.2)")
+    ap.add_argument("--nfluid", type=int, default=1,
+                    help="DEM steps per fluid (voidage) update; 1 = 1:1, 5 = paper's 5:1")
+    ap.add_argument("--out_tag", default=None,
+                    help="tag for the output file ramp_<out_tag>.npz (default: --tag)")
     a = ap.parse_args()
+    out_tag = a.out_tag or a.tag
 
     state, meta = load_state(f"out/state_{a.tag}.npz")
     kw = dict(W=float(meta["W"]), H=float(meta["H"]), nrow=int(meta["nrow"]),
               en=float(meta["en"]), mu_f=float(meta["mu_f"]), kn=float(meta["kn"]),
-              seed=int(meta["seed"]))
+              seed=int(meta["seed"]), nfluid=a.nfluid)
     if a.Ug_max is not None:
         kw["Ug_max"] = a.Ug_max
     if a.rate is not None:
@@ -44,11 +49,11 @@ def main():
     r = ramp(state, p, args)
     print(f"done in {(time.time()-t0)/60:.1f} min")
 
-    out = f"out/ramp_{a.tag}.npz"
+    out = f"out/ramp_{out_tag}.npz"
     np.savez_compressed(out, **r, N=N, W=p.W, dp=p.dp, m=p.m, g=p.g,
                         eps_mf=float(meta["eps_mf"]), h0=float(meta["h0"]),
                         dP_theory=p.dP_theory(N), en=p.en, mu_f=p.mu_f, seed=p.seed,
-                        ramp_rate=p.ramp_rate, Ug_max=p.Ug_max)
+                        ramp_rate=p.ramp_rate, Ug_max=p.Ug_max, nfluid=p.nfluid)
     print(f"saved {out}")
 
 
