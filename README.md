@@ -149,19 +149,53 @@ at 0.2 m/s², and the honest comparison is against Ergun at the measured ε_mf.
 
 ## Full-bed results (paper protocol: N = 3,380, W = 0.23 m, 0.2 m/s² ramp to 2.2 m/s)
 
-Same settled bed (ε_mf = 0.441) for both cases. Files: `out/*_full.*` and `out/*_full_5to1.*`.
+Three coupling variants, **5 runs each** (seeds 7, 11, 12, 13, 14). For each seed one settled
+bed (ε_mf = 0.432–0.445) is shared by all three variants, so the variants are compared on
+identical beds.
 
-| | 1 : 1 (`nfluid=1`) | 5 : 1 (`nfluid=5`) |
+- **1 : 1** — voidage and drag refreshed every DEM step (`nfluid=1`), nearest-cell binning.
+- **5 : 1** — voidage refreshed every 5 DEM steps (`nfluid=5`), nearest-cell binning.
+- **5 : 1 + interpolation** — as 5 : 1, with cloud-in-cell voidage and bilinear voidage at
+  each particle. **An extension beyond the proposal; its code is not part of this repository**
+  (only its result files are), so these runs cannot be reproduced from here.
+
+| | 1 : 1 | 5 : 1 | 5 : 1 + interpolation |
+|---|---|---|---|
+| u_mf, mean ± SD (descending fit) | **0.995 ± 0.012 m/s** | **0.992 ± 0.011 m/s** | **1.037 ± 0.006 m/s** |
+| standard error of the mean | 0.005 | 0.005 | 0.003 |
+| vs Ergun at each bed's own ε_mf | −9.5 % | −9.7 % | −5.6 % |
+| vs paper simulation (1.00 m/s) | −0.5 % | −0.8 % | +3.7 % |
+| vs NETL experiment (1.05 m/s) | −5.2 % | −5.5 % | −1.2 % |
+| plateau ΔP vs N m g/(W d_p), mean | 99.1 % | 98.0 % | 98.1 % |
+
+u_mf per seed (m/s):
+
+| seed | ε_mf | Ergun u_mf | 1 : 1 | 5 : 1 | 5 : 1 + interp. |
+|---|---|---|---|---|---|
+| 7 | 0.441 | 1.104 | 0.9885 | 1.0051 | 1.0445 |
+| 11 | 0.445 | 1.121 | 1.0155 | 0.9921 | 1.0292 |
+| 12 | 0.432 | 1.066 | 0.9847 | 0.9764 | 1.0378 |
+| 13 | 0.443 | 1.112 | 0.9927 | 0.9988 | 1.0399 |
+| 14 | 0.438 | 1.092 | 0.9933 | 0.9865 | 1.0356 |
+
+Paired comparisons (same bed per seed, paired t-test, n = 5):
+
+| comparison | mean difference | p |
 |---|---|---|
-| plateau ΔP vs N m g/(W d_p) | 99.9 % | 97.5 % |
-| u_mf (descending fit) | **0.989 m/s** | **1.005 m/s** |
-| vs Ergun at ε_mf (1.104 m/s) | −10.5 % | −9.0 % |
-| vs paper simulation (1.00 m/s) | −1.1 % | +0.5 % |
-| vs NETL experiment (1.05 m/s) | −5.9 % | −4.3 % |
-| wall-clock | 206 min | 200 min |
+| 5 : 1 − 1 : 1 | −0.003 m/s (−0.3 %) | 0.67 |
+| interpolation − 5 : 1 | +0.046 m/s (+4.6 %) | 0.001 |
+| interpolation − 1 : 1 | +0.043 m/s (+4.3 %) | 0.005 |
 
-Each is a single run, so the 1.6 % difference between the two cases is not shown to be
-significant; run `run_sweep.py --seeds 3` for run-to-run scatter.
+- The 1 : 1 and 5 : 1 results are **not distinguishable**: the difference changes sign from
+  seed to seed and is well inside the ≈ 0.012 m/s run-to-run scatter.
+- Interpolation raises u_mf by about 4–5 %, in all five seeds. That is larger than the
+  scatter, so it is a real effect of the voidage discretisation. Its closer agreement with
+  the experiment should not be read as the interpolated scheme being more correct: the 2-D
+  monolayer and one-way coupling also shift u_mf.
+- Files: seed 7 is `out/*_full.*`, `out/*_full_5to1.*`, `out/*_full_5to1_interp.*`; other
+  seeds add `_s<seed>` (for example `out/results_full_5to1_interp_s11.txt`).
+- Wall-clock: a single full ramp took 3.3–3.5 h; with three ramps running in parallel on 3
+  cores each took about 3.8–4.6 h.
 
 Animations (`out/fluidized_bed_demo.gif`, `out/fluidized_bed_full.gif`, from
 `animate.py`) are illustrations at a much faster ramp than the paper's.
