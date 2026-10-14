@@ -149,53 +149,71 @@ at 0.2 m/s², and the honest comparison is against Ergun at the measured ε_mf.
 
 ## Full-bed results (paper protocol: N = 3,380, W = 0.23 m, 0.2 m/s² ramp to 2.2 m/s)
 
-Three coupling variants, **5 runs each** (seeds 7, 11, 12, 13, 14). For each seed one settled
-bed (ε_mf = 0.432–0.445) is shared by all three variants, so the variants are compared on
+Six coupling variants, **10 runs each** (seeds 7, 11, 12, 13, 14, 15, 16, 17, 18, 19). For each seed one
+settled bed (ε_mf = 0.432–0.452) is shared by all six variants, so the variants are compared on
 identical beds.
 
-- **1 : 1** — voidage and drag refreshed every DEM step (`nfluid=1`), nearest-cell binning.
-- **5 : 1** — voidage refreshed every 5 DEM steps (`nfluid=5`), nearest-cell binning.
-- **5 : 1 + interpolation** — as 5 : 1, with cloud-in-cell voidage and bilinear voidage at
-  each particle. **An extension beyond the proposal; its code is not part of this repository**
-  (only its result files are), so these runs cannot be reproduced from here.
+- **1 : 1 / 5 : 1 / 10 : 1** — voidage refreshed every 1 / 5 / 10 DEM steps (`--nfluid 1|5|10`),
+  nearest-cell binning. 5 : 1 mimics the paper's fluid : DEM ratio; 10 : 1 is a further test.
+- **+ interp.** — as above, with cloud-in-cell voidage and bilinear voidage at each particle.
+  **An extension beyond the proposal; its code is not part of this repository** (only its result
+  files are), so these three variants cannot be reproduced from here.
 
-| | 1 : 1 | 5 : 1 | 5 : 1 + interpolation |
-|---|---|---|---|
-| u_mf, mean ± SD (descending fit) | **0.995 ± 0.012 m/s** | **0.992 ± 0.011 m/s** | **1.037 ± 0.006 m/s** |
-| standard error of the mean | 0.005 | 0.005 | 0.003 |
-| vs Ergun at each bed's own ε_mf | −9.5 % | −9.7 % | −5.6 % |
-| vs paper simulation (1.00 m/s) | −0.5 % | −0.8 % | +3.7 % |
-| vs NETL experiment (1.05 m/s) | −5.2 % | −5.5 % | −1.2 % |
-| plateau ΔP vs N m g/(W d_p), mean | 99.1 % | 98.0 % | 98.1 % |
+| | 1 : 1 | 5 : 1 | 10 : 1 | 1 : 1 + interp. | 5 : 1 + interp. | 10 : 1 + interp. |
+|---|---|---|---|---|---|---|
+| u_mf, mean ± SD (descending fit) | **0.993 ± 0.011 m/s** | **0.991 ± 0.008 m/s** | **0.997 ± 0.013 m/s** | **1.037 ± 0.016 m/s** | **1.040 ± 0.006 m/s** | **1.039 ± 0.009 m/s** |
+| standard error of the mean | 0.003 | 0.003 | 0.004 | 0.005 | 0.002 | 0.003 |
+| 95 % CI of the mean (m/s) | 0.985–1.001 | 0.985–0.996 | 0.988–1.006 | 1.025–1.048 | 1.036–1.045 | 1.033–1.046 |
+| vs Ergun at each bed's own ε_mf | -10.7 % | -10.9 % | -10.3 % | -6.8 % | -6.5 % | -6.5 % |
+| vs paper simulation (1.00 m/s) | -0.7 % | -0.9 % | -0.3 % | +3.7 % | +4.0 % | +3.9 % |
+| vs NETL experiment (1.05 m/s) | -5.4 % | -5.7 % | -5.0 % | -1.3 % | -0.9 % | -1.0 % |
+| plateau ΔP vs N m g/(W d_p), mean | 98.7 % | 98.0 % | 99.0 % | 98.4 % | 98.5 % | 98.4 % |
 
 u_mf per seed (m/s):
 
-| seed | ε_mf | Ergun u_mf | 1 : 1 | 5 : 1 | 5 : 1 + interp. |
-|---|---|---|---|---|---|
-| 7 | 0.441 | 1.104 | 0.9885 | 1.0051 | 1.0445 |
-| 11 | 0.445 | 1.121 | 1.0155 | 0.9921 | 1.0292 |
-| 12 | 0.432 | 1.066 | 0.9847 | 0.9764 | 1.0378 |
-| 13 | 0.443 | 1.112 | 0.9927 | 0.9988 | 1.0399 |
-| 14 | 0.438 | 1.092 | 0.9933 | 0.9865 | 1.0356 |
+| seed | ε_mf | Ergun u_mf | 1 : 1 | 5 : 1 | 10 : 1 | 1 : 1 + interp. | 5 : 1 + interp. | 10 : 1 + interp. |
+|---|---|---|---|---|---|---|---|---|
+| 7 | 0.441 | 1.104 | 0.9885 | 1.0051 | 0.9895 | 1.0386 | 1.0445 | 1.0358 |
+| 11 | 0.445 | 1.121 | 1.0155 | 0.9921 | 1.0150 | 1.0087 | 1.0292 | 1.0265 |
+| 12 | 0.432 | 1.066 | 0.9847 | 0.9764 | 1.0044 | 1.0364 | 1.0378 | 1.0514 |
+| 13 | 0.443 | 1.111 | 0.9927 | 0.9988 | 0.9987 | 1.0489 | 1.0399 | 1.0474 |
+| 14 | 0.438 | 1.091 | 0.9933 | 0.9865 | 0.9864 | 1.0472 | 1.0356 | 1.0372 |
+| 15 | 0.449 | 1.138 | 0.9922 | 0.9934 | 1.0206 | 1.0346 | 1.0431 | 1.0297 |
+| 16 | 0.440 | 1.099 | 1.0009 | 0.9864 | 0.9833 | 1.0556 | 1.0382 | 1.0318 |
+| 17 | 0.447 | 1.131 | 0.9965 | 0.9811 | 0.9979 | 1.0541 | 1.0479 | 1.0415 |
+| 18 | 0.442 | 1.109 | 0.9727 | 0.9906 | 0.9849 | 1.0187 | 1.0378 | 1.0378 |
+| 19 | 0.452 | 1.153 | 0.9924 | 0.9947 | 0.9917 | 1.0224 | 1.0487 | 1.0553 |
 
-Paired comparisons (same bed per seed, paired t-test, n = 5):
+Paired comparisons (same bed per seed, paired t-test, n = 10; difference as a percentage of the
+second case, with its 95 % confidence interval):
 
-| comparison | mean difference | p |
-|---|---|---|
-| 5 : 1 − 1 : 1 | −0.003 m/s (−0.3 %) | 0.67 |
-| interpolation − 5 : 1 | +0.046 m/s (+4.6 %) | 0.001 |
-| interpolation − 1 : 1 | +0.043 m/s (+4.3 %) | 0.005 |
+| comparison | mean difference | 95 % CI | p |
+|---|---|---|---|
+| 5 : 1 − 1 : 1 | -0.002 m/s (-0.2 %) | -1.2 % to +0.7 % | 0.59 |
+| 10 : 1 − 1 : 1 | +0.004 m/s (+0.4 %) | -0.5 % to +1.4 % | 0.33 |
+| 10 : 1 − 5 : 1 | +0.007 m/s (+0.7 %) | -0.4 % to +1.8 % | 0.20 |
+| 5 : 1 − 1 : 1 (interp.) | +0.004 m/s (+0.4 %) | -0.7 % to +1.4 % | 0.45 |
+| 10 : 1 − 1 : 1 (interp.) | +0.003 m/s (+0.3 %) | -0.9 % to +1.5 % | 0.61 |
+| 10 : 1 − 5 : 1 (interp.) | -0.001 m/s (-0.1 %) | -0.7 % to +0.5 % | 0.76 |
+| interp. − none, at 1 : 1 | +0.044 m/s (+4.4 %) | +3.0 % to +5.8 % | < 0.001 |
+| interp. − none, at 5 : 1 | +0.050 m/s (+5.0 %) | +4.3 % to +5.7 % | < 0.001 |
+| interp. − none, at 10 : 1 | +0.042 m/s (+4.2 %) | +3.0 % to +5.5 % | < 0.001 |
 
-- The 1 : 1 and 5 : 1 results are **not distinguishable**: the difference changes sign from
-  seed to seed and is well inside the ≈ 0.012 m/s run-to-run scatter.
-- Interpolation raises u_mf by about 4–5 %, in all five seeds. That is larger than the
-  scatter, so it is a real effect of the voidage discretisation. Its closer agreement with
-  the experiment should not be read as the interpolated scheme being more correct: the 2-D
-  monolayer and one-way coupling also shift u_mf.
-- Files: seed 7 is `out/*_full.*`, `out/*_full_5to1.*`, `out/*_full_5to1_interp.*`; other
-  seeds add `_s<seed>` (for example `out/results_full_5to1_interp_s11.txt`).
-- Wall-clock: a single full ramp took 3.3–3.5 h; with three ramps running in parallel on 3
-  cores each took about 3.8–4.6 h.
+- **The fluid : DEM update ratio has no detectable effect** on u_mf over 1 : 1 – 10 : 1, with or
+  without interpolation (every p ≥ 0.2). Any effect is bounded by about ±1.5 %; a repeated-measures
+  test across the three ratios gives p = 0.91 without and 0.79 with interpolation. The 95 %
+  intervals cannot exclude a difference of about 1 %, so this is "no effect larger than ≈ 1.5 %",
+  not proof of zero effect.
+- **Interpolation raises u_mf by about 4–5 %** at every ratio (p < 0.001, 95 % interval about
+  +3 % to +6 %). That is far larger than the run-to-run scatter, so it is a real effect of the
+  voidage discretisation. Its closer agreement with the experiment should not be read as the
+  interpolated scheme being more correct: the 2-D monolayer and one-way coupling also shift u_mf.
+- Run-to-run (bed-to-bed) SD of u_mf is 0.006–0.016 m/s (0.6–1.6 %).
+- Files: seed 7 is `out/*_full.*`, `out/*_full_5to1.*`, `out/*_full_10to1.*` and the `_interp`
+  variants (including `_1to1_interp`); other seeds add `_s<seed>`, e.g.
+  `out/results_full_10to1_interp_s15.txt`.
+- Wall-clock: a single full ramp took 3.3–3.5 h; with five or six ramps running in parallel on 3
+  cores each took about 4.5–6.3 h.
 
 Animations (`out/fluidized_bed_demo.gif`, `out/fluidized_bed_full.gif`, from
 `animate.py`) are illustrations at a much faster ramp than the paper's.
