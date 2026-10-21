@@ -12,7 +12,7 @@ import time
 import numpy as np
 from numba import njit
 from contact import pair_force, wall_forces
-from drag import voidage, apply_drag
+from drag import voidage, apply_drag, solids_flux_rows, apply_drag_2way
 
 
 # --------------------------------------------------------------------------- kernel
@@ -20,16 +20,20 @@ from drag import voidage, apply_drag
 def step(x, y, vx, vy, N, Ug, nsub, usedrag,
          dt, R, m, Iner, kn, kt, etan, etat, mu_f, g,
          W, H, NCX, NCY, dx, dy, dp, rg, mug, Vp, ap, eps_switch, eps_min,
-         ncell, head, nxt, cw, ch, nfluid):
+         ncell, head, nxt, cw, ch, nfluid, two_way):
     """
     Advance nsub steps. usedrag = 0/1 switches the gas coupling.
     The voidage field (the "fluid update") is refreshed every nfluid DEM steps, starting
     at the first step of each call; drag on each particle is applied every DEM step from
     the most recent field. nfluid = 1 is the original 1:1 scheme, 5 is the paper's 5:1.
+    two_way = 1 adds 1-D volume-flux coupling: the row-averaged solids flux q_s is refreshed
+    together with the voidage and the gas velocity becomes u_g = (U_g - q_s) / eps_g.
+    two_way = 0 (default) is the one-way model with u_g = U_g / eps_g.
     Returns mean total drag force over the substeps (N); ΔP = F / (W d_p).
     """
     dsum = 0.0
     eps = np.ones((NCX, NCY))
+    qs = np.zeros(NCY)
     for k in range(nsub):
         fx = np.zeros(N)
         fy = np.zeros(N)
@@ -93,8 +97,14 @@ def step(x, y, vx, vy, N, Ug, nsub, usedrag,
         if usedrag == 1:
             if k % nfluid == 0:
                 eps = voidage(x, y, N, NCX, NCY, dx, dy, Vp, dp, eps_min)
-            dsum += apply_drag(x, y, vy, fy, N, Ug, eps, NCX, NCY, dx, dy,
-                               dp, rg, mug, Vp, eps_switch)
+                if two_way == 1:
+                    qs = solids_flux_rows(y, vy, N, NCY, dy, W, Vp, dp)
+            if two_way == 1:
+                dsum += apply_drag_2way(x, y, vy, fy, N, Ug, eps, qs, NCX, NCY, dx, dy,
+                                        dp, rg, mug, Vp, eps_switch)
+            else:
+                dsum += apply_drag(x, y, vy, fy, N, Ug, eps, NCX, NCY, dx, dy,
+                                   dp, rg, mug, Vp, eps_switch)
 
         # ---- symplectic Euler ----
         for i in range(N):
