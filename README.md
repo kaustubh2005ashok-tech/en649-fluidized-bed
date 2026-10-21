@@ -232,6 +232,60 @@ second case, with its 95 % confidence interval):
 - Wall-clock: a single full ramp took 3.3–3.5 h; with five or six ramps running in parallel on 3
   cores each took about 4.5–6.3 h.
 
+### Two-way (1-D volume-flux) coupling vs one-way, 5 : 1, nearest-cell, same beds
+
+Branch `feature/two-way-volume-flux`. Same 15 settled beds (seeds 7, 11–24) and protocol as above; the only
+difference is `--two_way` (u_g = (U_g − q_s)/ε_g instead of U_g/ε_g). Files: `out/*_full_5to1_2way*`.
+
+| seed | ε_mf | Ergun u_mf | one-way 5 : 1 | two-way 5 : 1 | difference | one-way plateau | two-way plateau |
+|---|---|---|---|---|---|---|---|
+| 7 | 0.441 | 1.104 | 1.0051 | 1.0021 | -0.0030 | 97.5 % | 98.3 % |
+| 11 | 0.445 | 1.121 | 0.9921 | 0.9944 | +0.0023 | 98.5 % | 97.9 % |
+| 12 | 0.432 | 1.066 | 0.9764 | 0.9886 | +0.0122 | 97.1 % | 97.3 % |
+| 13 | 0.443 | 1.111 | 0.9988 | 0.9919 | -0.0069 | 99.0 % | 97.9 % |
+| 14 | 0.438 | 1.091 | 0.9865 | 0.9765 | -0.0100 | 98.0 % | 97.6 % |
+| 15 | 0.449 | 1.138 | 0.9934 | 0.9888 | -0.0046 | 98.0 % | 99.2 % |
+| 16 | 0.440 | 1.099 | 0.9864 | 0.9803 | -0.0061 | 97.5 % | 98.9 % |
+| 17 | 0.447 | 1.131 | 0.9811 | 1.0061 | +0.0250 | 97.9 % | 98.5 % |
+| 18 | 0.442 | 1.109 | 0.9906 | 0.9859 | -0.0047 | 98.0 % | 98.3 % |
+| 19 | 0.452 | 1.153 | 0.9947 | 0.9829 | -0.0118 | 98.7 % | 97.5 % |
+| 20 | 0.445 | 1.121 | 0.9896 | 0.9792 | -0.0104 | 98.4 % | 96.9 % |
+| 21 | 0.445 | 1.122 | 1.0058 | 0.9838 | -0.0220 | 98.7 % | 98.3 % |
+| 22 | 0.442 | 1.109 | 0.9963 | 1.0039 | +0.0076 | 99.0 % | 99.3 % |
+| 23 | 0.435 | 1.078 | 1.1039 ⚠ | 1.0128 | -0.0911 | 127.6 % ⚠ | 98.9 % |
+| 24 | 0.445 | 1.119 | 0.9837 | 0.9891 | +0.0054 | 97.2 % | 97.1 % |
+
+⚠ Seed 23, one-way 5 : 1: plateau ΔP is 1,155 Pa = **127.6 % of the bed weight** (peak 1,647 Pa), which **fails
+Checkpoint 3** (plateau within 10 %). It is the only failure among all 105 full-bed runs, and the six other
+variants on the same bed behave normally (plateaus 878–901 Pa). The cause was not diagnosed (a bed pinned
+against the hard ceiling, limitation 4, is one candidate). Its u_mf (1.104 m/s) is therefore not trusted, and
+results are given both with and without it.
+
+| | one-way, all 15 | two-way, all 15 | one-way, 14 (no seed 23) | two-way, 14 (no seed 23) |
+|---|---|---|---|---|
+| u_mf, mean ± SD | **0.999 ± 0.030 m/s** | **0.991 ± 0.011 m/s** | **0.991 ± 0.008 m/s** | **0.990 ± 0.009 m/s** |
+| vs Ergun at each bed's own ε_mf | -10.1 % | -10.8 % | -11.0 % | -11.1 % |
+| vs paper simulation (1.00 m/s) | -0.1 % | -0.9 % | -0.9 % | -1.0 % |
+| vs NETL experiment (1.05 m/s) | -4.9 % | -5.6 % | -5.6 % | -5.8 % |
+| plateau ΔP vs N m g/(W d_p), mean | 100.1 % | 98.1 % | 98.1 % | 98.1 % |
+
+Paired difference (two-way − one-way):
+
+| | n | mean difference | 95 % CI | paired t, p | Wilcoxon, p | up / down |
+|---|---|---|---|---|---|---|
+| all 15 beds | 15 | -0.0079 m/s (-0.79 %) | -2.2 % to +0.6 % | 0.25 | 0.28 | 5 / 10 |
+| excluding seed 23 | 14 | -0.0019 m/s (-0.19 %) | -0.9 % to +0.5 % | 0.55 | 0.46 | 5 / 9 |
+
+- **No detectable effect of the 1-D volume-flux coupling on u_mf.** The mean shift is −0.2 % (14 valid pairs) or
+  −0.8 % (all 15), both inside the 95 % interval around zero; the paired scatter is about 0.012 m/s (1.2 %), and
+  the sign is mixed. Any effect is bounded by about ±1 % (excluding seed 23).
+- Plateau ΔP is unchanged (98.1 % of bed weight in both, excluding seed 23).
+- This is consistent with the expectation that in a batch bed upward and downward solids motion largely cancel
+  in the row-averaged flux. The fixed-bed region is unchanged by construction (particles at rest, Checkpoint 4a).
+- The flux calculation adds no measurable run time (−0.4 % demo bed, −0.7 % full bed; within noise).
+- Scope: nearest-cell voidage only; the interpolated variants above were not run in two-way mode.
+
+
 Animations (`out/fluidized_bed_demo.gif`, `out/fluidized_bed_full.gif`, from
 `animate.py`) are illustrations at a much faster ramp than the paper's.
 
