@@ -24,15 +24,18 @@ def main():
     ap.add_argument("--rate", type=float, default=None, help="ramp rate m/s^2 (paper: 0.2)")
     ap.add_argument("--nfluid", type=int, default=1,
                     help="DEM steps per fluid (voidage) update; 1 = 1:1, 5 = paper's 5:1")
+    ap.add_argument("--two_way", action="store_true",
+                    help="1-D volume-flux coupling: u_g = (U_g - q_s)/eps_g (default: one-way U_g/eps_g)")
     ap.add_argument("--out_tag", default=None,
-                    help="tag for the output file ramp_<out_tag>.npz (default: --tag)")
+                    help="tag for the output file ramp_<out_tag>.npz (default: --tag, or <tag>_2way "
+                         "with --two_way, so one-way results are never overwritten)")
     a = ap.parse_args()
-    out_tag = a.out_tag or a.tag
+    out_tag = a.out_tag or (f"{a.tag}_2way" if a.two_way else a.tag)
 
     state, meta = load_state(f"out/state_{a.tag}.npz")
     kw = dict(W=float(meta["W"]), H=float(meta["H"]), nrow=int(meta["nrow"]),
               en=float(meta["en"]), mu_f=float(meta["mu_f"]), kn=float(meta["kn"]),
-              seed=int(meta["seed"]), nfluid=a.nfluid)
+              seed=int(meta["seed"]), nfluid=a.nfluid, two_way=int(a.two_way))
     if a.Ug_max is not None:
         kw["Ug_max"] = a.Ug_max
     if a.rate is not None:
@@ -42,6 +45,8 @@ def main():
     args = p.kernel_args(N)
 
     print(p.summary())
+    print(f"coupling: {'two-way 1-D volume flux' if p.two_way else 'one-way'}, "
+          f"nfluid={p.nfluid}, output tag {out_tag}")
     print(f"N={N}  eps_mf={float(meta['eps_mf']):.4f}  ramp to {p.Ug_max} m/s at {p.ramp_rate} m/s^2  "
           f"({2*p.Ug_max/p.ramp_rate:.1f} s physical, {int(2*p.Ug_max/p.ramp_rate/p.dt)/1e6:.1f} M steps)")
 
@@ -53,7 +58,8 @@ def main():
     np.savez_compressed(out, **r, N=N, W=p.W, dp=p.dp, m=p.m, g=p.g,
                         eps_mf=float(meta["eps_mf"]), h0=float(meta["h0"]),
                         dP_theory=p.dP_theory(N), en=p.en, mu_f=p.mu_f, seed=p.seed,
-                        ramp_rate=p.ramp_rate, Ug_max=p.Ug_max, nfluid=p.nfluid)
+                        ramp_rate=p.ramp_rate, Ug_max=p.Ug_max, nfluid=p.nfluid,
+                        two_way=p.two_way)
     print(f"saved {out}")
 
 
