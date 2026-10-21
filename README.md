@@ -66,6 +66,10 @@ python analysis.py
 python run_ramp.py --nfluid 5 --out_tag full_5to1           # ~3.3 h, saves out/ramp_full_5to1.npz
 python analysis.py --tag full_5to1
 
+# 3c. same, with 1-D volume-flux (two-way) coupling; output defaults to <tag>_2way
+python run_ramp.py --nfluid 5 --two_way --out_tag full_5to1_2way
+python analysis.py --tag full_5to1_2way
+
 # 4. sensitivity (9 cases, 6 workers)
 python run_sweep.py                       # demo bed, fast ramp
 python run_sweep.py --seeds 3             # run-to-run scatter
@@ -117,6 +121,19 @@ velocity. `nfluid = 1` (default) is the original **1 : 1** scheme; `nfluid = 5` 
 the paper's **5 : 1** ratio. The gas momentum equation and its reaction term S_p
 (paper Eq. 2) are **not** solved; the paper's 5 : 1 ratio comes from their coupled
 Navier–Stokes solve, so here it only staggers the voidage update.
+
+**Two-way option (1-D volume-flux coupling)** — `--two_way` on `run_ramp.py`
+(`Params.two_way`, default 0 = the one-way model above; all results above the two-way
+section use the one-way model). The gas phase satisfies 1-D incompressible volume
+continuity, ε_g u_g + ε_s v_s = U_g, with the solids flux averaged over each row of fluid
+cells and refreshed together with the voidage field. The gas momentum equation is not
+solved: the particle reaction S_p acts on the pressure profile, which is recovered as
+ΔP = ΣF_d/(W d_p). Lateral gas redistribution around dense regions is not modelled. In code,
+for each row of fluid cells, q_s = Σ V_p v_y / (W Δy d_p) and u_g = (U_g − q_s)/ε_g
+replaces U_g/ε_g (`drag.solids_flux_rows`, `drag.apply_drag_2way`); u_g is allowed to go
+negative locally and is not clamped, and no separate −V_p ∇p force is added (the Ergun
+branch of β is already the total-force form). With all particles at rest the model reduces
+exactly to the one-way one (Checkpoint 4a).
 
 **u_mf extraction** — descending branch only (the ascending branch carries the
 overshoot spike). Fixed-bed region fitted to a U + b U² (Ergun form — these particles
@@ -245,8 +262,16 @@ in `run_ramp.py`, and a demo-bed pipeline for development.
 
 1. **2-D monolayer** — no front/back walls, looser packing than 3-D; shifts u_mf up
    via ε^{3/2}.
-2. **One-way coupling** — gas cannot redistribute around dense regions; bubbles are
-   weaker and smaller than in resolved CFD-DEM.
+2. **One-way coupling (default) / 1-D volume-flux coupling (`--two_way`)** — gas cannot
+   redistribute laterally around dense regions; bubbles are weaker and smaller than in
+   resolved CFD-DEM. Context, for the emulsion at u_mf (ε_g = 0.441): particle response time
+   τ_p = ρ_p ε_s/β ≈ 0.28 s; Stokes number St = τ_p/τ_f ≈ 1.9 at the bed-transit scale
+   (H/U_g ≈ 0.15 s) and 0.6–1.4 at the bubble scale (2–5 Hz); solids volume fraction
+   φ_v ≈ 0.56; mass loading ≈ 1,200; |S_p| ≈ 5,100 Pa/m against ≈ 19 Pa/m of gas convective
+   inertia. The Stokes number does **not** justify one-way coupling (the bed is in the
+   four-way-coupling regime of Elghobashi's map); the justification for the 1-D treatment
+   rests on gas incompressibility (plateau ΔP ≈ 905 Pa is ≈ 0.9 % of atmospheric) and on
+   the aim being the quasi-static ΔP–U_g curve and u_mf.
 3. **No rotation / no tangential history spring** — rotational ODE is stiff at this k_n
    (I ≈ 2×10⁻¹¹ kg m²) and diverges under a dashpot-only tangential law. Adding a
    history spring is the next physics upgrade.
