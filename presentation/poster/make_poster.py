@@ -42,7 +42,7 @@ def hold(u, kind):
 
 def savep(fig, name):
     p = os.path.join(PAN, name)
-    fig.savefig(p, dpi=220, bbox_inches="tight")
+    fig.savefig(p, dpi=400, bbox_inches="tight")
     plt.close(fig)
     return p
 
@@ -298,12 +298,26 @@ def poster(pc, ours):
     fig = plt.figure(figsize=(PW, PH))
     # ---------------- header
     fig.patches.append(Rectangle((0, 0.925), 1, 0.075, transform=fig.transFigure, fc=C["navy"], ec="none"))
-    fig.text(0.5, 0.978, "Reproducing a CFD-DEM Study of a Geldart-D Fluidized Bed in Python",
-             ha="center", va="center", color="white", fontsize=40, fontweight="bold")
-    fig.text(0.5, 0.956, "One-Way vs Quasi-Two-Way Gas Coupling, compared with Liu & van Wachem (2019)",
-             ha="center", va="center", color="white", fontsize=32, fontweight="bold")
-    fig.text(0.5, 0.936, "Kaustubh Ashok (24B1522)  ·  EN 649 Course Project  ·  Indian Institute of Technology Bombay",
-             ha="center", va="center", color="#dfe6f5", fontsize=26)
+    # logo on a white badge (the emblem is blue on transparent)
+    lw_ = 0.068
+    lh_ = lw_ * PW / PH
+    lx, ly = 0.018, 0.9625 - lh_ / 2
+    fig.patches.append(FancyBboxPatch((lx - 0.004, ly - 0.004 * PW / PH), lw_ + 0.008, lh_ + 0.008 * PW / PH,
+                                      boxstyle="round,pad=0,rounding_size=0.008", transform=fig.transFigure,
+                                      fc="white", ec="none", zorder=2))
+    lax = fig.add_axes([lx, ly, lw_, lh_])
+    lax.imshow(plt.imread(os.path.join(HERE, "logo", "iitb_logo.png")))
+    lax.set_axis_off()
+    lax.set_zorder(5)
+    xc = 0.545                                       # text centre, shifted right of the logo
+    fig.text(xc, 0.983, "Reproducing a CFD-DEM Study of a Geldart-D Fluidized Bed in Python",
+             ha="center", va="center", color="white", fontsize=36, fontweight="bold")
+    fig.text(xc, 0.965, "One-Way vs Quasi-Two-Way Gas Coupling, compared with Liu & van Wachem (2019)",
+             ha="center", va="center", color="white", fontsize=28, fontweight="bold")
+    fig.text(xc, 0.947, "Kaustubh Ashok (24B1522)  ·  EN 649 Course Project", ha="center", va="center",
+             color="#dfe6f5", fontsize=24)
+    fig.text(xc, 0.933, "Instructor: Prof. Manaswita Bose  ·  Indian Institute of Technology Bombay",
+             ha="center", va="center", color="#dfe6f5", fontsize=24)
 
     M, G = 0.018, 0.012                             # outer margin, gutter
     colw = (1 - 2 * M - 2 * G) / 3
@@ -452,8 +466,9 @@ def poster(pc, ours):
     ], 64, size=14, color=C["ink2"])
 
     out = os.path.join(HERE, "poster_A1.pdf")
-    fig.savefig(out)
-    fig.savefig(os.path.join(HERE, "poster_A1_preview.png"), dpi=60)
+    fig.savefig(out, dpi=300)                        # dpi sets the resolution of the embedded figure images
+    fig.savefig(os.path.join(HERE, "poster_A1_preview.png"), dpi=100)
+    fig.savefig(os.path.join(HERE, "poster_A1_300dpi.png"), dpi=300)
     plt.close(fig)
     print("wrote", out)
 
