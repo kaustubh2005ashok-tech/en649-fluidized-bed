@@ -114,7 +114,8 @@ def main():
 
     # ---- write a results row ----
     with open(f"out/results_{a.tag}.txt", "w") as f:
-        f.write(f"tag={a.tag} N={int(d['N'])} en={float(d['en'])} mu={float(d['mu_f'])} seed={int(d['seed'])}\n")
+        extra = f" two_way={int(d['two_way'])}" if "two_way" in d.files else ""
+        f.write(f"tag={a.tag} N={int(d['N'])} en={float(d['en'])} mu={float(d['mu_f'])} seed={int(d['seed'])}{extra}\n")
         f.write(f"eps_mf={eps_mf:.4f} dP_theory={dP_th:.1f} plateau={plateau:.1f}\n")
         f.write(f"umf_sim={umf:.4f} umf_ergun={umf_ergun:.4f} umf_expt={U_MF_EXPT}\n")
     print(f"\nsaved out/fluidization_curve_{a.tag}.png, out/bed_expansion_{a.tag}.png, out/results_{a.tag}.txt")

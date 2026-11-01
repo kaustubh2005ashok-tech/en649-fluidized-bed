@@ -1,0 +1,3 @@
+tag=demo_5to1_oneway N=624 en=0.84 mu=0.35 seed=7 two_way=0
+eps_mf=0.4806 dP_theory=427.0 plateau=407.6
+umf_sim=1.0490 umf_ergun=1.2773 umf_expt=1.05

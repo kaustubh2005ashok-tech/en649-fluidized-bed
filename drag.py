@@ -98,6 +98,57 @@ def apply_drag(x, y, vy, fy, N, Ug, eps, NCX, NCY, dx, dy, dp, rg, mug, Vp, eps_
     return dtot
 
 
+# --------------------------------------------------------------------------- 1-D volume-flux coupling
+@njit(cache=True, error_model="numpy")
+def solids_flux_rows(y, vy, N, NCY, dy, W, Vp, dp):
+    """Solids volume flux per row of fluid cells, q_s = sum(V_p v_y) / (W dy d_p)  [m/s]."""
+    q = np.zeros(NCY)
+    for i in range(N):
+        cy = int(y[i] / dy)
+        if cy < 0:
+            cy = 0
+        if cy >= NCY:
+            cy = NCY - 1
+        q[cy] += Vp * vy[i]
+    vol = W * dy * dp
+    for j in range(NCY):
+        q[j] /= vol
+    return q
+
+
+@njit(cache=True, error_model="numpy")
+def apply_drag_2way(x, y, vy, fy, N, Ug, eps, qs, NCX, NCY, dx, dy,
+                    dp, rg, mug, Vp, eps_switch):
+    """
+    As apply_drag(), but the gas velocity responds to the solids flux through 1-D volume
+    continuity  eps_g u_g + eps_s v_s = U_g :   u_g = (U_g - q_s[row]) / eps_g.
+    u_g may go negative locally (gas moving down); it is not clamped.
+    """
+    dtot = 0.0
+    for i in range(N):
+        cx = int(x[i] / dx)
+        cy = int(y[i] / dy)
+        if cx < 0:
+            cx = 0
+        if cx >= NCX:
+            cx = NCX - 1
+        if cy < 0:
+            cy = 0
+        if cy >= NCY:
+            cy = NCY - 1
+        e = eps[cx, cy]
+        es = 1.0 - e
+        if es < 1e-4:
+            es = 1e-4
+        ug = (Ug - qs[cy]) / e
+        urel = ug - vy[i]
+        bt = beta_gidaspow(e, urel, dp, rg, mug, eps_switch)
+        Fd = bt * urel * Vp / es
+        fy[i] += Fd
+        dtot += Fd
+    return dtot
+
+
 # --------------------------------------------------------------------------- Ergun reference (pure Python)
 def ergun_dPdz(U, eps, dp, rho_g, mu_g):
     """Ergun pressure gradient [Pa/m] for SUPERFICIAL velocity U."""

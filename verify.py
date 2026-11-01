@@ -6,6 +6,8 @@ change to contact.py / drag.py / sim.py.
   1b  gravity settling: kinetic energy decays monotonically to ~0 (catches sign errors)
   2   frozen lattice at known voidage: summed drag / area matches Ergun ΔP/L
   3   (run after run_ramp.py) fluidized plateau ≈ N m g / (W d_p)   — see analysis.py
+  4   1-D volume-flux coupling (solids_flux_rows, apply_drag_2way): rest reduces to one-way,
+      flux bookkeeping, conservation, and the force with moving solids
 
 Usage:  python verify.py            (all)      python verify.py 1a 2   (subset)
 """
@@ -99,8 +101,78 @@ def checkpoint_2(tol=0.03):
     return ok_all
 
 
+def checkpoint_4(tol=1e-9):
+    """
+    1-D volume-flux coupling on the cell-aligned frozen lattice (uniform eps in occupied cells).
+    (a) particles at rest: apply_drag_2way == apply_drag.
+    (b) all particles at v_y = v: q_s = (1 - eps) v in occupied rows, 0 elsewhere.
+    (c) random v_y: sum(q_s) W dy d_p == sum(V_p v_y).
+    (d) all at v_y = v, U_g = 1: total drag equals the hand value with
+        u_g = (U_g - (1 - eps) v) / eps, u_rel = u_g - v  (v = 3 m/s gives u_rel < 0).
+    """
+    from drag import solids_flux_rows, apply_drag_2way, beta_gidaspow
+    ok_all = True
+    p = Params(W=0.23, H=0.30, cell_dp=3.0)
+    state, eps_exact, L = lattice_layer(p, 2, ncells_y=4)
+    x, y, vx, vy = state
+    N = x.size
+    eps = voidage(x, y, N, p.NCX, p.NCY, p.dx, p.dy, p.Vp, p.dp, p.eps_min)
+    args = (p.NCX, p.NCY, p.dx, p.dy, p.dp, p.rho_g, p.mu_g, p.Vp, p.eps_switch)
+    print("[4 ] 1-D volume-flux coupling on a cell-aligned lattice:")
+
+    # (a) rest: identical to the one-way force
+    qs0 = solids_flux_rows(y, vy, N, p.NCY, p.dy, p.W, p.Vp, p.dp)
+    f1 = np.zeros(N); f2 = np.zeros(N)
+    apply_drag(x, y, vy, f1, N, 1.0, eps, *args)
+    apply_drag_2way(x, y, vy, f2, N, 1.0, eps, qs0, *args)
+    err = np.max(np.abs(f2 - f1) / np.abs(f1))
+    ok = err < 1e-12 and np.all(qs0 == 0.0)
+    ok_all &= ok
+    print(f"     4a rest:  max rel diff vs one-way = {err:.1e}   {PASS if ok else FAIL}")
+
+    # (b) uniform velocity: q_s = (1 - eps) v in occupied rows
+    v = 0.3
+    vyv = np.full(N, v)
+    q = solids_flux_rows(y, vyv, N, p.NCY, p.dy, p.W, p.Vp, p.dp)
+    occ = np.zeros(p.NCY, bool)
+    occ[np.minimum((y / p.dy).astype(int), p.NCY - 1)] = True
+    err = max(np.max(np.abs(q[occ] - (1 - eps_exact) * v) / ((1 - eps_exact) * v)),
+              np.max(np.abs(q[~occ])))
+    ok = err < 1e-12
+    ok_all &= ok
+    print(f"     4b flux:  q_s = (1-eps) v in {occ.sum()} occupied rows, 0 elsewhere, err = {err:.1e}   "
+          f"{PASS if ok else FAIL}")
+
+    # (c) random velocities: the accumulation is conservative
+    rng = np.random.default_rng(1)
+    vr = rng.uniform(-1.0, 1.0, N)
+    qr = solids_flux_rows(y, vr, N, p.NCY, p.dy, p.W, p.Vp, p.dp)
+    lhs = qr.sum() * p.W * p.dy * p.dp
+    rhs = np.sum(p.Vp * vr)
+    err = abs(lhs - rhs) / np.sum(p.Vp * np.abs(vr))
+    ok = err < 1e-12
+    ok_all &= ok
+    print(f"     4c conservation: sum(q_s) W dy d_p vs sum(V_p v_y), rel err = {err:.1e}   {PASS if ok else FAIL}")
+
+    # (d) force with moving solids, including a negative slip
+    for v in (0.3, 3.0):
+        vyv = np.full(N, v)
+        q = solids_flux_rows(y, vyv, N, p.NCY, p.dy, p.W, p.Vp, p.dp)
+        fy = np.zeros(N)
+        F = apply_drag_2way(x, y, vyv, fy, N, 1.0, eps, q, *args)
+        ug = (1.0 - (1 - eps_exact) * v) / eps_exact
+        urel = ug - v
+        F_hand = N * beta_gidaspow(eps_exact, urel, p.dp, p.rho_g, p.mu_g, p.eps_switch) * urel * p.Vp / (1 - eps_exact)
+        err = abs(F - F_hand) / abs(F_hand)
+        ok = err < tol and np.sign(F) == np.sign(urel)
+        ok_all &= ok
+        print(f"     4d v={v:.1f} m/s: u_rel={urel:+.3f}  sim={F:+.5f} N  hand={F_hand:+.5f} N  "
+              f"err={err:.1e}   {PASS if ok else FAIL}")
+    return ok_all
+
+
 if __name__ == "__main__":
-    which = sys.argv[1:] or ["1a", "1b", "2"]
+    which = sys.argv[1:] or ["1a", "1b", "2", "4"]
     results = {}
     if "1a" in which:
         results["1a"] = checkpoint_1a()
@@ -108,6 +180,8 @@ if __name__ == "__main__":
         results["1b"] = checkpoint_1b()
     if "2" in which:
         results["2"] = checkpoint_2()
+    if "4" in which:
+        results["4"] = checkpoint_4()
     print()
     print("ALL PASSED" if all(results.values()) else "SOME CHECKS FAILED")
     sys.exit(0 if all(results.values()) else 1)
