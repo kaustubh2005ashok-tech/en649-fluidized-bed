@@ -12,6 +12,11 @@ solved. The original one-way model (u_g = U_g/ε_g) is kept as the baseline and 
 (`two_way = 0`), so every earlier result stays reproducible. Headline: u_mf = 0.990 ± 0.009 m/s over 14
 beds, against 1.05 m/s in the experiment and 1.00 m/s in the paper's simulation (see Full-bed results).
 
+**Final submission:** [`final submission/`](final%20submission/) holds the A1 poster (PDF and 300 dpi PNG) and
+the 1–4 u_mf results video. Supporting figures, data and the results table with its limitations are in
+[`presentation/`](presentation/). Scripts for those: `run_hold.py` (constant-U_g runs), `paper_figs.py` and
+`paper_flow.py` (paper figures), `make_video.py` (video), `presentation/poster/make_poster.py` (poster).
+
 ---
 
 ## Layout
