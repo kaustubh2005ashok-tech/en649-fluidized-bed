@@ -77,28 +77,82 @@ def paper_crops():
 
 
 # ------------------------------------------------------------------ our panels
-def our_fig1():
+W_VOL = 1131.0 * (1 - 0.44) * 9.81                   # bed weight per unit volume at ε_mf, N/m³
+
+
+def momentum_residual(u, kind, t0=5.0, every=5):
+    """Time-mean |R| per fluid cell, R = f_cell − ε_cell G_row: the part of the gas–particle drag in a cell that the
+    row-uniform pressure gradient G_row = Σ_row f / Σ_row ε (the only one this model implies) does not balance.
+    A solved gas momentum equation (the paper) gives each cell its own ∇p, so R = 0 there."""
     import sys
     sys.path.insert(0, REPO)
-    import paper_figs                                   # reuse the Table A1 implementation
-    eg = np.linspace(0.4, 0.9999, 500)
-    b, _ = paper_figs.beta_models(eg)
-    es = 1 - eg
-    Vp = np.pi / 6 * paper_figs.DP ** 3
-    m = paper_figs.RHO_P * Vp
-    fig, ax = plt.subplots(figsize=(6, 4.6))
-    cols = dict(WY="#2a78d6", WYE="#eb6834", DF="#1baf7a", SYO="#eda100", BEE="#e87ba4")
-    names = dict(WY="Wen/Yu (WY)", WYE="Wen/Yu + Ergun (WYE)", DF="Di Felice (DF)", SYO="Syamlal–O'Brien (SYO)",
-                 BEE="Beetstra (BEE)")
-    for k, v in b.items():
-        ax.plot(eg, v * 3.0 * Vp / es / m / 9.81, color=cols[k], lw=2.2, label=names[k])
-    ax.set_xlim(0.4, 1.0)
-    ax.set_ylim(0, 1.0)
-    ax.set_xlabel("gas volume fraction ε$_g$ (−)")
-    ax.set_ylabel("drag force / m g (−)")
-    ax.legend(loc="upper right", fontsize=11.5)
-    ax.text(0.41, 0.03, "d$_p$ = 3.256 mm, ρ$_p$ = 1131 kg/m³, |u$_g$−v$_p$| = 3 m/s", fontsize=11, color=C["ink2"])
-    return savep(fig, "our_fig1.png")
+    from drag import apply_drag, apply_drag_2way
+    r = hold(u, kind)
+    NCX, NCY, dx, dy, dp, Vp = (int(r["NCX"]), int(r["NCY"]), float(r["dx"]), float(r["dy"]), float(r["dp"]),
+                                float(r["Vp"]))
+    N, Ug = int(r["N"]), float(r["Ug"])
+    ks = np.where(r["t"] >= t0)[0][::every]
+    A = np.zeros((NCX, NCY))
+    E = np.zeros((NCX, NCY))
+    for k in ks:
+        x, y, vy = (r[a][k].astype(float) for a in ("x", "y", "vy"))
+        eps = r["eps"][k].astype(float)
+        fy = np.zeros(N)
+        if kind == "2way":
+            apply_drag_2way(x, y, vy, fy, N, Ug, eps, r["qs"][k].astype(float), NCX, NCY, dx, dy, dp, 1.21, 1.8e-5,
+                            Vp, 0.8)
+        else:
+            apply_drag(x, y, vy, fy, N, Ug, eps, NCX, NCY, dx, dy, dp, 1.21, 1.8e-5, Vp, 0.8)
+        f = np.zeros((NCX, NCY))
+        np.add.at(f, (np.clip((x / dx).astype(int), 0, NCX - 1), np.clip((y / dy).astype(int), 0, NCY - 1)), fy)
+        f /= dx * dy * dp
+        A += np.abs(f - eps * (f.sum(0) / eps.sum(0))[None, :])
+        E += eps
+    return A / len(ks) / W_VOL, E / len(ks), float(r["W"]), float(r["H"])
+
+
+def our_momentum():
+    # reference side: the equation the paper solves in every cell
+    fig = plt.figure(figsize=(5.0, 3.8))
+    fig.text(0.02, 0.95, "Gas momentum, solved in every fluid cell:", fontsize=14, fontweight="bold", va="top")
+    fig.text(0.04, 0.78, r"$\frac{\partial(\varepsilon_g\rho_g\mathbf{u}_g)}{\partial t}+\nabla\cdot(\varepsilon_g"
+             r"\rho_g\mathbf{u}_g\mathbf{u}_g)=$", fontsize=16)
+    fig.text(0.12, 0.65, r"$-\varepsilon_g\nabla p+\nabla\cdot(\varepsilon_g\boldsymbol{\tau}_g)"
+             r"+\varepsilon_g\rho_g\mathbf{g}+\mathbf{S}_p$", fontsize=16)
+    fig.text(0.04, 0.52, r"$\mathbf{S}_p=-\frac{1}{V_{cell}}\sum_{i\in cell}\mathbf{F}_{d,i}$"
+             "  (drag on the gas)", fontsize=14)
+    fig.text(0.02, 0.40, "Each cell has its own ∇p (x and y), so the\ndrag in every cell is balanced locally:",
+             fontsize=13, color=C["ink2"], linespacing=1.35, va="top")
+    fig.text(0.5, 0.17, r"$R_{cell}=0$ in every cell", fontsize=20, ha="center", color=C["good"],
+             fontweight="bold")
+    fig.text(0.5, 0.03, "→ gas turns round dense regions → bubbles", fontsize=13, ha="center", color=C["ink2"])
+    p_ref = savep(fig, "ref_momentum.png")
+
+    # this work: residual maps at 2 u_mf, one-way and quasi-two-way, same colour scale
+    fig = plt.figure(figsize=(5.0, 3.8))
+    fig.text(0.01, 0.985, r"No gas momentum eq.; one $\partial p/\partial y$ per row, $\partial p/\partial x=0$:",
+             fontsize=13, fontweight="bold", va="top")
+    fig.text(0.01, 0.905, r"$R_{cell}=f_{drag,cell}-\varepsilon_{cell}\,\Sigma_{row}f_{drag}\,/\,"
+             r"\Sigma_{row}\varepsilon$", fontsize=14, va="top")
+    stats = {}
+    for j, (kind, lab, col) in enumerate((("1way", "one-way", C["oneway"]), ("2way", "quasi-two-way", C["twoway"]))):
+        R, E, W, H = momentum_residual("2.19", kind)
+        bed = E < 0.8
+        stats[kind] = (R[bed].mean(), R.max())
+        ax = fig.add_axes([0.06 + 0.31 * j, 0.06, 0.28, 0.66])
+        im = ax.imshow(R.T, origin="lower", extent=(0, W, 0, H), cmap="Reds", vmin=0, vmax=1.5, aspect="equal")
+        ax.set_title(f"{lab}\nbed mean {R[bed].mean():.2f}", fontsize=12.5, color=col, fontweight="bold")
+        ax.set_xticks([0, 0.1, 0.2])
+        ax.tick_params(labelsize=9.5)
+        ax.grid(False)
+        if j:
+            ax.set_yticklabels([])
+    cb = fig.colorbar(im, cax=fig.add_axes([0.70, 0.10, 0.03, 0.56]))
+    cb.set_label("|R$_{cell}$| / bed weight\nper volume (time mean)", fontsize=11.5)
+    cb.ax.tick_params(labelsize=9.5)
+    fig.text(0.70, 0.73, "2 u$_{mf}$, 5–15 s", fontsize=11.5, color=C["ink2"])
+    print("momentum residual (mean in bed, max):", stats)
+    return p_ref, savep(fig, "our_momentum_2umf.png"), stats
 
 
 def _ramp_files(kind):
@@ -109,11 +163,17 @@ def _ramp_files(kind):
 
 
 def our_fig2():
+    """Drawn on the paper's exact axes (0–1.4 m/s, 0–1500 Pa, same ticks) so the two panels compare by eye.
+    Grey marks are read off the paper's Fig. 2."""
     edges = np.arange(0, 2.25, 0.05)
     c = 0.5 * (edges[1:] + edges[:-1])
-    fig, ax = plt.subplots(figsize=(6.4, 4.6))
-    for k, lab in (("oneway", "one-way"), ("twoway", "quasi-two-way")):
-        for br, ls, arrow in ((1, "-", "+ (fluidization)"), (-1, "--", "− (de-fluidization)")):
+    fig, ax = plt.subplots(figsize=(5.0, 3.8))
+    ax.axhline(1030, color="#9a9a9a", lw=1.2, ls="--")
+    ax.text(0.02, 1050, "paper plateau ≈ 1030 Pa", fontsize=11.5, color="#6a6a6a")
+    ax.plot([0.8], [1130], marker="v", ms=10, color="#9a9a9a", ls="none")
+    ax.text(0.8, 1185, "paper overshoot ≈ 1130 Pa", fontsize=11.5, color="#6a6a6a", ha="center")
+    for k, lab in (("oneway", "1-way"), ("twoway", "q-2-way")):
+        for br, ls, arrow in ((1, "-", "↑"), (-1, "--", "↓")):
             rows = []
             for f in _ramp_files(k):
                 r = np.load(f)
@@ -126,15 +186,18 @@ def our_fig2():
             if br == 1:
                 ax.fill_between(c, mu - sd, mu + sd, color=C[k], alpha=0.15, lw=0)
     ax.axhline(WEIGHT, color=C["ink2"], lw=1, ls=":")
-    ax.text(0.03, WEIGHT + 25, "bed weight / area = 905 Pa", fontsize=11, color=C["ink2"])
+    ax.text(0.02, WEIGHT - 75, "our bed weight 905 Pa", fontsize=11.5, color=C["ink2"])
     ax.axvline(0.99, color=C["ink2"], lw=1, ls=":")
-    ax.text(1.01, 120, "u$_{mf}$ = 0.99 m/s", fontsize=12, color=C["ink"])
-    ax.set_xlim(0, 1.6)
-    ax.set_ylim(0, 1200)
-    ax.set_xlabel("fluidizing gas velocity u$_g$ (m/s)")
-    ax.set_ylabel("bed pressure drop ΔP$_{bed}$ (Pa)")
-    ax.legend(loc="upper left", fontsize=11, bbox_to_anchor=(0, 0.93))
-    ax.set_title("mean ± SD over 14 beds per coupling", fontsize=12, color=C["ink2"])
+    ax.text(0.97, 1380, "u$_{mf}$ = 0.99", fontsize=12, color=C["ink"], ha="right")
+    ax.set_xlim(0, 1.4)
+    ax.set_ylim(0, 1500)
+    ax.set_xticks(np.arange(0, 1.41, 0.25))
+    ax.set_yticks(np.arange(0, 1501, 300))
+    ax.tick_params(labelsize=11)
+    ax.set_xlabel("U$_g$ (m/s)", fontsize=13)
+    ax.set_ylabel("bed pressure drop ΔP$_{bed}$ (Pa)", fontsize=13)
+    ax.legend(loc="lower right", fontsize=11, ncol=2, columnspacing=0.8, handlelength=1.6,
+              title="14-bed mean ± SD", title_fontsize=10.5)
     return savep(fig, "our_fig2.png")
 
 
@@ -280,9 +343,8 @@ def image(fig, path, x, y, w, h, label=None, label_color=None):
     return ax
 
 
-def compare_card(fig, x, y, w, h, title, paper_img, our_img, takeaway, ok=True, our_label="This work"):
+def compare_card(fig, x, y, w, h, title, paper_img, our_img, takeaway, ok=True, our_label="This work", tk_h=0.034):
     cx, cy, cw, ch = box(fig, x, y, w, h, title)
-    tk_h = 0.034
     img_h = ch - tk_h - 0.012
     half = (cw - 0.01) / 2
     image(fig, paper_img, cx, cy + tk_h, half, img_h - 0.002, "Liu & van Wachem (2019)", C["ink2"])
@@ -390,27 +452,32 @@ def poster(pc, ours):
              ha="center", va="center", color="white", fontsize=32, fontweight="bold")
 
     w2 = (1 - 2 * M - G) / 2
-    rh = 0.145
-    r1 = yb - 0.006 - rh
-    compare_card(fig, M, r1, w2, rh, "Fig. 1 — Drag models", pc["fig1"], ours["fig1"],
-                 "All five Table A1 closures reproduced to plotting accuracy (incl. the WYE jump at ε = 0.8).")
-    compare_card(fig, M + w2 + G, r1, w2, rh, "Fig. 2 — ΔP_bed vs u_g and u_mf", pc["fig2"], ours["fig2"],
-                 "u_mf = 0.990 ± 0.009 (quasi-2-way), 0.991 ± 0.008 m/s (1-way) vs paper 1.00, expt 1.05; "
-                 "plateau 98 % of weight.")
+    rh = 0.14
+    rh1 = 0.165
+    r1 = yb - 0.006 - rh1
+    m1, m2 = ours["mom_stats"]["1way"][0], ours["mom_stats"]["2way"][0]
+    compare_card(fig, M, r1, w2, rh1, "Gas momentum conservation per fluid cell", ours["mom_ref"], ours["mom"],
+                 f"Not conserved. Inside the bed, drag equal to {50 * (m1 + m2):.0f} % of the local bed weight is left "
+                 "unbalanced by any pressure gradient (red). The paper balances every cell, so its gas can turn "
+                 "round dense regions and form bubbles; ours cannot.", ok=False, tk_h=0.047)
+    compare_card(fig, M + w2 + G, r1, w2, rh1, "Fig. 2 — ΔP_bed vs u_g (same axes)", pc["fig2"], ours["fig2"],
+                 "u_mf matches (0.99 vs 1.00 paper, 1.05 expt). Missing: the 10 % overshoot at 0.8 m/s, the early "
+                 "rise (260 vs ≈ 550 Pa at 0.5 m/s) and the ≈ 100 Pa hysteresis. Lower plateau = lighter 2-D bed "
+                 "(905 vs 1075 Pa).", ok="partial", tk_h=0.047)
     r2 = r1 - G - rh
     compare_card(fig, M, r2, w2, rh, "Fig. 3 — ΔP_bed time series at 2 u_mf", pc["fig3"], ours["fig3"],
                  "Mean ΔP = 0.99 × weight (paper 0.94 ×) ✔. Fluctuations (SD ≈ 30–40 Pa) are much smaller "
                  "than the paper's (≈ 500–1800 Pa swings).", ok="partial")
     compare_card(fig, M + w2 + G, r2, w2, rh, "Fig. 4 — Power spectrum of ΔP_bed at 2 u_mf", pc["fig4"],
                  ours["fig4"], "One-way peak 4.5 Hz lies in the paper's 2–5 Hz band; quasi-two-way peak 1.2 Hz.")
-    r3 = r2 - G - 0.172
-    compare_card(fig, M, r3, w2, 0.172, "Fig. 5 — Snapshot at 2 u_mf, t = 14.5 s", pc["fig5"], ours["fig5"],
+    r3 = r2 - G - 0.162
+    compare_card(fig, M, r3, w2, 0.162, "Fig. 5 — Snapshot at 2 u_mf, t = 14.5 s", pc["fig5"], ours["fig5"],
                  "Bed fluidizes with a dense base and dilute core, but forms one large central void with solids "
                  "rising at the walls; the paper shows discrete bubbles.", ok="partial")
 
     # ---------------- problem box (3 & 4 u_mf)
     px = M + w2 + G
-    cx, cy, cw, ch = box(fig, px, r3, w2, 0.172, "The Problem at 3 u_mf and 4 u_mf (this work)", color=C["warn"],
+    cx, cy, cw, ch = box(fig, px, r3, w2, 0.162, "The Problem at 3 u_mf and 4 u_mf (this work)", color=C["warn"],
                          bg="#fffafa")
     image(fig, ours["prob_dP"], cx, cy + 0.056, cw * 0.66, ch - 0.058)
     image(fig, ours["prob_snap"], cx + cw * 0.67, cy + 0.056, cw * 0.33, ch - 0.058)
@@ -475,7 +542,8 @@ def poster(pc, ours):
 
 if __name__ == "__main__":
     pc = paper_crops()
-    ours = dict(fig1=our_fig1(), fig2=our_fig2(), fig3=our_fig3(), fig4=our_fig4(),
+    ours = dict(fig2=our_fig2(), fig3=our_fig3(), fig4=our_fig4(),
                 fig5=our_snapshots("2.19", (("1way", "one-way"), ("2way", "quasi-two-way")), "our_fig5_2umf.png"))
     ours["prob_dP"], ours["prob_snap"] = our_problem()
+    ours["mom_ref"], ours["mom"], ours["mom_stats"] = our_momentum()
     poster(pc, ours)
