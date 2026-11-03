@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>EN 649 Project Explained</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<style>
+  @page { size: A4; margin: 18mm 17mm 18mm 17mm;
+          @bottom-left { content: "EN 649 project — what we actually did"; font: 8pt Arial, sans-serif; color: #777; }
+          @bottom-right { content: counter(page); font: 8pt Arial, sans-serif; color: #777; } }
+  :root { --head: #1f6f9f; --ink: #1b1b1b; --muted: #5a5a5a; --rule: #c9d6df; --band: #eef4f8;
+          --good: #1b7a4b; --bad: #b3261e; --part: #9a6700; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Times New Roman", Times, serif; font-size: 10.6pt; line-height: 1.38; color: var(--ink);
+         background: #fff; margin: 0; }
+  h1 { font-family: Arial, Helvetica, sans-serif; font-size: 17pt; line-height: 1.2; margin: 0 0 4pt; }
+  h2 { font-family: Arial, Helvetica, sans-serif; color: var(--head); font-size: 13pt; margin: 15pt 0 5pt;
+       break-after: avoid; }
+  h3 { font-family: Arial, Helvetica, sans-serif; font-size: 10.8pt; margin: 10pt 0 3pt; break-after: avoid; }
+  p { margin: 0 0 6pt; text-align: justify; }
+  .sub { color: var(--head); font-style: italic; font-size: 11.5pt; margin: 2pt 0 4pt; }
+  .by { color: var(--muted); font-size: 9.5pt; margin-bottom: 8pt; }
+  table { border-collapse: collapse; width: 100%; font-size: 9.2pt; margin: 4pt 0 8pt; break-inside: avoid; }
+  th { text-align: left; background: var(--band); font-family: Arial, sans-serif; font-size: 8.6pt; }
+  th, td { border-bottom: 1px solid var(--rule); padding: 3pt 5pt; vertical-align: top; }
+  td.k { white-space: nowrap; color: var(--muted); }
+  .glance td:first-child { width: 22%; color: var(--muted); }
+  .ok { color: var(--good); font-weight: bold; } .no { color: var(--bad); font-weight: bold; }
+  .mid { color: var(--part); font-weight: bold; }
+  figure { margin: 6pt 0 10pt; text-align: center; break-inside: avoid; }
+  figure img { max-width: 100%; }
+  figcaption { font-size: 8.8pt; font-style: italic; color: var(--muted); text-align: center; margin-top: 3pt; }
+  .box { background: var(--band); border-left: 3px solid var(--head); padding: 5pt 9pt; margin: 6pt 0 9pt;
+         font-size: 9.8pt; break-inside: avoid; }
+  .box b:first-child { font-family: Arial, sans-serif; }
+  ul { margin: 0 0 6pt; padding-left: 16pt; } li { margin-bottom: 3pt; text-align: justify; }
+  .eq { margin: 4pt 0 6pt; break-before: avoid; break-inside: avoid; }
+  code { font-family: Consolas, monospace; font-size: 9pt; }
+  .pb { break-before: page; }
+  .katex { font-size: 1.02em; }
+</style>
+</head>
+<body>
+
+<h1>Reproducing a CFD-DEM study of a bubbling fluidized bed in Python</h1>
+<div class="sub">A guided breakdown of what we actually did: what we built, how it works, what it reproduced, what it
+did not, and why</div>
+<div class="by">EN 649 (Particulate Flow) · Kaustubh Ashok, 24B1522 · Instructor: Prof. Manaswita Bose, IIT Bombay ·
+Companion to the breakdown of Liu &amp; van Wachem (2019), Powder Technology 343, 145–158 ·
+Code: github.com/kaustubh2005ashok-tech/en649-fluidized-bed</div>
+
+<h2>The project at a glance</h2>
+<table class="glance">
+<tr><td>Question</td><td>How much of Liu &amp; van Wachem's CFD-DEM results can a DEM code written from scratch in
+Python reproduce if the gas is treated in one dimension instead of being solved as a 3-D flow?</td></tr>
+<tr><td>System</td><td>The NETL SSCP particles (3.256 mm, 1131 kg/m³, Geldart D) in a 0.23 m wide, one-particle-thick
+(2-D monolayer) bed: 3,380 particles, settled height 0.146 m, bed weight 905 Pa per unit area.</td></tr>
+<tr><td>Method</td><td>Soft-sphere DEM (paper's contact parameters) in Python + Numba, Gidaspow drag on a 24 × 56 grid of
+3 d<sub>p</sub> cells. Two gas models: <i>one-way</i>, u<sub>g</sub> = U<sub>g</sub>/ε<sub>g</sub>, and
+<i>quasi-two-way</i>, u<sub>g</sub> = (U<sub>g</sub> − q<sub>s</sub>)/ε<sub>g</sub>. No gas momentum equation.</td></tr>
+<tr><td>Runs</td><td>28 velocity ramps (14 beds × 2 couplings, plus 70 more ramps testing update ratio and voidage
+interpolation) and 8 constant-velocity holds of 15 s at 1, 2, 3 and 4 u<sub>mf</sub>.</td></tr>
+<tr><td>Reproduced</td><td>u<sub>mf</sub> = 0.990 ± 0.009 m/s (paper 1.00, experiment 1.05); plateau pressure drop
+equal to the bed weight; mean ΔP at 1 and 2 u<sub>mf</sub>; one-way pressure-fluctuation frequency in the paper's
+2–5 Hz band.</td></tr>
+<tr><td>Not reproduced</td><td>Overshoot and hysteresis in the ΔP–U<sub>g</sub> curve; ΔP fluctuation size; discrete
+bubbles at 2 u<sub>mf</sub>; any valid state at 3 and 4 u<sub>mf</sub>, where the bed lifts as a plug and ΔP reaches
+6× and 12× the bed weight.</td></tr>
+<tr><td>Main message</td><td>Integral quantities near u<sub>mf</sub> follow from a force balance and come out right
+even with a 1-D gas. Anything that needs gas to flow <i>around</i> particles (bubbles, bypass, fluctuations) needs
+the gas momentum equation, and adding the solids flux to the gas velocity does not supply it.</td></tr>
+</table>
+
+<h2>1. What we set out to do</h2>
+<p>The reference paper runs a full CFD-DEM model of the NETL Small Scale Challenge Problem: every particle is tracked
+with Newton's laws, and the gas is solved on a grid with volume-averaged Navier–Stokes equations, two-way coupled
+through drag. It then scores the model against experiment on pressure drop, minimum fluidization velocity, bubbles and
+particle velocities.</p>
+<p>Our aim was narrower. The proposal set out to rebuild the particle side of that model from scratch, in Python,
+with the paper's particle and contact parameters, and to replace the gas solver with the simplest treatment that can
+still fluidize a bed: a prescribed superficial velocity turned into a local gas velocity through the voidage. The
+point was to see how far that gets, to measure the run-to-run scatter, and to find exactly where it stops working.
+Read this way, the project asks three questions:</p>
+<ul>
+<li>Can a from-scratch DEM code with a 1-D gas reproduce the paper's minimum fluidization velocity and pressure
+drop?</li>
+<li>Does letting the gas respond to the solids flux (quasi-two-way coupling) change the answer?</li>
+<li>Which of the paper's results need the gas momentum equation, and how do they fail without it?</li>
+</ul>
+
+<h2>2. The system we simulated</h2>
+<p>The paper's bed is pseudo-2-D: 0.23 m wide and 0.075 m (23 d<sub>p</sub>) deep. Ours keeps the width and the
+particles but is truly two-dimensional: one layer of spheres, one diameter thick, with no front or back walls. All
+material and contact values come from the paper's Table 1 through a single file, <code>params.py</code>.</p>
+<table>
+<tr><th>Property</th><th>Paper (3-D)</th><th>This work (2-D monolayer)</th><th>Comment</th></tr>
+<tr><td>d<sub>p</sub>, ρ<sub>p</sub></td><td>3.256 mm, 1131 kg/m³</td><td>same</td><td></td></tr>
+<tr><td>ρ<sub>g</sub>, μ<sub>g</sub></td><td>1.21 kg/m³, 1.8 × 10⁻⁵ Pa·s</td><td>same</td><td></td></tr>
+<tr><td>k<sub>n</sub>, k<sub>t</sub>, e<sub>n</sub>, μ</td><td>3654, 1044 N/m, 0.84, 0.35</td><td>same</td><td>k<sub>t</sub>/k<sub>n</sub> = 2/7</td></tr>
+<tr><td>Bed size</td><td>0.23 × 0.075 × 1.22 m</td><td>0.23 m × 0.55 m × 1 d<sub>p</sub></td><td>hard ceiling at 0.55 m</td></tr>
+<tr><td>Particles</td><td>92,547</td><td>3,380 (52 rows × 65)</td><td>settled by gravity from a lattice</td></tr>
+<tr><td>Settled height, ε<sub>mf</sub></td><td>0.167 m, 0.42</td><td>0.146 m, 0.432–0.452 (bed 7: 0.441)</td><td>2-D packs looser</td></tr>
+<tr><td>Bed weight / area</td><td>1075 Pa</td><td>905 Pa</td><td>shorter bed, see box</td></tr>
+<tr><td>Fluid grid</td><td>22 × 7 × 114, ≈ 3.2 d<sub>p</sub></td><td>24 × 56, 9.6 × 9.8 mm ≈ 3 d<sub>p</sub></td><td></td></tr>
+<tr><td>Time steps</td><td>DEM 20 µs, gas 100 µs</td><td>DEM 3.33 µs; voidage every 5 steps</td><td>see §3.5</td></tr>
+<tr><td>Gas phase</td><td>VANS equations, 3-D</td><td>no gas equations; 1-D velocity rule</td><td>the main difference</td></tr>
+</table>
+<div class="box"><b>Consistency checks (own calculation).</b> Bed mass N m = 3380 × 2.044 × 10⁻⁵ kg = 0.0691 kg.
+Weight per monolayer cross-section N m g / (W d<sub>p</sub>) = 905 Pa, which is also
+(1 − ε)ρ<sub>p</sub> g h = 0.559 × 1131 × 9.81 × 0.146 m. The paper's 1075 Pa comes from a taller (0.167 m), denser
+(ε = 0.42) bed, so ΔP is compared as a fraction of each bed's own weight. Ar = 1.43 × 10⁶ (Geldart D). Ergun at our
+measured ε<sub>mf</sub> = 0.441 gives u<sub>mf</sub> = 1.104 m/s; Wen–Yu gives 0.96 m/s.</div>
+
+<h2>3. How we did it</h2>
+<h3>3.1 Code structure</h3>
+<p>Everything is plain Python with the inner loops compiled by Numba (<code>@njit</code>). One DEM step costs about
+2.5 ms for 3,380 particles, so a 15 s run is 4.5 million steps and takes about 3 hours.</p>
+<figure>
+<svg viewBox="0 0 700 215" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif" font-size="11">
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#1f6f9f"/></marker></defs>
+  <g fill="#eef4f8" stroke="#1f6f9f" stroke-width="1.2">
+    <rect x="10" y="20" width="130" height="50" rx="6"/><rect x="10" y="140" width="130" height="50" rx="6"/>
+    <rect x="200" y="20" width="140" height="50" rx="6"/><rect x="200" y="140" width="140" height="50" rx="6"/>
+    <rect x="400" y="20" width="135" height="50" rx="6"/><rect x="400" y="140" width="135" height="50" rx="6"/>
+    <rect x="585" y="80" width="105" height="50" rx="6"/>
+  </g>
+  <g text-anchor="middle" fill="#1b1b1b">
+    <text x="75" y="40" font-weight="bold">params.py</text><text x="75" y="56">Table 1–2 inputs, t_c, Δt</text>
+    <text x="75" y="160" font-weight="bold">bed.py · run_settle</text><text x="75" y="176">lattice → gravity settle</text>
+    <text x="270" y="40" font-weight="bold">cell list</text><text x="270" y="56">3 d_p bins, 9 neighbours</text>
+    <text x="270" y="160" font-weight="bold">contacts + walls</text><text x="270" y="176">spring–dashpot–slider</text>
+    <text x="467" y="36" font-weight="bold">every 5 steps:</text><text x="467" y="51">voidage ε_g per cell</text><text x="467" y="64">(+ q_s per row, 2-way)</text>
+    <text x="467" y="160" font-weight="bold">drag on each particle</text><text x="467" y="176">Gidaspow β, u_g rule</text>
+    <text x="637" y="100" font-weight="bold">integrate</text><text x="637" y="116">symplectic Euler</text>
+  </g>
+  <g stroke="#1f6f9f" stroke-width="1.4" fill="none" marker-end="url(#a)">
+    <path d="M75,70 L75,138"/><path d="M140,165 L198,50"/><path d="M270,70 L270,138"/>
+    <path d="M340,165 L398,45"/><path d="M467,70 L467,138"/><path d="M535,165 L583,112"/>
+    <path d="M637,80 C637,0 300,0 272,18"/>
+  </g>
+  <text x="455" y="12" fill="#5a5a5a" font-size="10" text-anchor="middle">next step (Δt = 3.33 µs); every 1/50 s record ΔP = ΣF_d / (W d_p)</text>
+</svg>
+<figcaption>Figure 1. One DEM step as implemented in <code>sim.step()</code>. Unlike the paper's loop there is no
+gas solve: the voidage field (and, for quasi-two-way, the row solids flux) is the only information passed from
+particles to "gas", and nothing is passed back except drag.</figcaption>
+</figure>
+
+<h3>3.2 Particle phase</h3>
+<p>Each particle obeys Newton's second law with gravity, contact forces from neighbours and walls, and drag:</p>
+<div class="eq">$$ m\,\frac{d\mathbf v_a}{dt} = m\mathbf g + \sum_b \left(\mathbf F_{n,ab} + \mathbf F_{t,ab}\right) +
+\mathbf F_{d,a}, \qquad \mathbf F_d = \frac{\beta\,(u_g - v_{p,y})\,V_p}{\varepsilon_s}\,\hat{\mathbf y} $$</div>
+<p>Compared with the paper's Eq. (3), two terms are missing. There is no separate pressure-gradient force
+−V<sub>p</sub>∇p, because the Ergun branch of β is used in its total-force form (it already contains the support the
+paper splits between drag and pressure). And there is no rotation: the tangential force is a Coulomb-capped dashpot
+with no history spring, and the rotational equation diverged at this stiffness when we tried it, so torque was left
+out. Drag acts only vertically, since the 1-D gas has no horizontal velocity.</p>
+<p>Contacts use the same linear spring–dashpot–slider as the paper. The damping follows from the restitution
+coefficient, and the time step from the contact time:</p>
+<div class="eq">$$ F_n = k_n\delta - \eta_n v_n \ (\ge 0),\quad \zeta = \frac{-\ln e_n}{\sqrt{\ln^2 e_n+\pi^2}},\quad
+\eta_n = 2\zeta\sqrt{k_n m_{\text{eff}}},\quad t_c = \frac{\pi}{\omega_0\sqrt{1-\zeta^2}},\quad \Delta t =
+\frac{t_c}{50} $$</div>
+<table>
+<tr><th>Derived quantity (own calculation)</th><th>Value</th><th>Comment</th></tr>
+<tr><td>m; m<sub>eff</sub> = m/2</td><td>2.04 × 10⁻⁵ kg; 1.02 × 10⁻⁵ kg</td><td>same as paper</td></tr>
+<tr><td>ζ; η<sub>n</sub></td><td>0.055; 0.0214 N·s/m</td><td>η<sub>t</sub> = η<sub>n</sub></td></tr>
+<tr><td>t<sub>c</sub>; Δt</td><td>166 µs; 3.33 µs</td><td>50 steps per contact (paper ≈ 8)</td></tr>
+<tr><td>Max overlap at 1 m/s</td><td>48 µm = 1.5 % of d<sub>p</sub></td><td>soft spring, small overlaps</td></tr>
+</table>
+<figure><img src="figs/fig2_collision.png">
+<figcaption>Figure 2. One head-on collision integrated with the code's own scheme (own calculation). Left: overlap
+history. Right: restitution actually produced at different step sizes. Symplectic Euler returns the input
+e<sub>n</sub> to within 2 % from 5 steps per contact upward, so a single collision does not need t<sub>c</sub>/50;
+see §6.</figcaption></figure>
+
+<h3>3.3 Gas–solid drag</h3>
+<p>β is the Gidaspow closure, written for the interstitial slip u<sub>g</sub> − v<sub>p</sub> so that the pressure
+gradient is β(u<sub>g</sub> − u<sub>s</sub>):</p>
+<div class="eq">$$ \beta = \begin{cases} \dfrac{150\,\varepsilon_s^2\mu_g}{\varepsilon_g^2 d_p^2} + \dfrac{1.75\,
+\varepsilon_s\rho_g|u_g-v_p|}{\varepsilon_g d_p}, & \varepsilon_g < 0.8 \ \text{(Ergun)}\\[8pt] \tfrac34 C_D
+\dfrac{\varepsilon_s\varepsilon_g\rho_g|u_g-v_p|}{d_p}\,\varepsilon_g^{-2.65}, & \varepsilon_g \ge 0.8 \
+\text{(Wen–Yu)} \end{cases} \qquad C_D = \frac{24}{Re}\left(1+0.15Re^{0.687}\right) $$</div>
+<p>Substituting the superficial velocity U = ε<sub>g</sub>u into Ergun gives the ε<sub>g</sub>² and
+ε<sub>g</sub> denominators above. Leaving that factor out was the first bug in the project and made u<sub>mf</sub>
+60 % too high; Checkpoint 2a (§3.6) now tests it. The voidage counts particle volume in each cell as a slab one
+diameter thick, ε<sub>g</sub> = 1 − ΣV<sub>p</sub>/(Δx Δy d<sub>p</sub>), clamped to [0.36, 1], which puts a
+close-packed monolayer at about 0.46 instead of the areal value of about 0.2 that the correlations cannot handle.</p>
+
+<h3>3.4 The two gas models</h3>
+<p>The paper solves gas continuity and momentum in every cell (its Eqs. 1–2). We solve neither. The gas velocity in a
+cell is set by a rule:</p>
+<div class="eq">$$ \text{one-way:}\quad u_g = \frac{U_g}{\varepsilon_g} \qquad\qquad \text{quasi-two-way:}\quad u_g =
+\frac{U_g - q_s}{\varepsilon_g},\quad q_s = \frac{\sum_{\text{row}} V_p v_{p,y}}{W\,\Delta y\, d_p} $$</div>
+<p>The quasi-two-way rule is 1-D volume continuity, ε<sub>g</sub>u<sub>g</sub> + ε<sub>s</sub>v<sub>s</sub> =
+U<sub>g</sub>, applied to each row of cells. When solids in a row move up, less gas has to pass through them, and
+vice versa. With every particle at rest it reduces exactly to the one-way rule (Checkpoint 4a). In both models the
+bed pressure drop is not solved for but recovered from the total drag, ΔP<sub>bed</sub> = ΣF<sub>d</sub>/(W
+d<sub>p</sub>). Neither model lets gas move sideways, and neither has a pressure field that differs across a row.</p>
+
+<h3>3.5 Numerical set-up</h3>
+<ul>
+<li><b>Integration.</b> Symplectic Euler, Δt = t<sub>c</sub>/50 = 3.33 µs; cell-list neighbour search on the
+3 d<sub>p</sub> grid.</li>
+<li><b>Fluid update.</b> Voidage (and q<sub>s</sub>) refreshed every 5 DEM steps, mimicking the paper's 5 : 1 ratio;
+drag applied every step from the latest field. 1 : 1 and 10 : 1 were also run.</li>
+<li><b>Boundaries.</b> Side walls and floor use the particle contact law with infinite mass; the top is a hard
+ceiling at 0.55 m, not a pressure outlet.</li>
+<li><b>Beds.</b> 15 beds (seeds 7, 11–24) built from a jittered lattice and settled under gravity. Bed 23 is excluded
+from all results because one of its runs failed Checkpoint 3 (plateau at 128 % of the weight); its files are kept.</li>
+<li><b>Runs.</b> Ramps follow the paper: U<sub>g</sub> up at 0.2 m/s² to 2.2 m/s, then down, ΔP sampled at 50 Hz.
+Holds ramp U<sub>g</sub> over 2 s (an instant step threw the bed into the ceiling), then hold to 15 s; statistics
+use 5–15 s, as in the paper. Holds were run on bed 7 only.</li>
+</ul>
+
+<h3>3.6 Verification checkpoints</h3>
+<p>These run in about 30 s (<code>verify.py</code>) and were repeated after every change to the force code.
+Checkpoint 1b alone caught three sign errors during development.</p>
+<table>
+<tr><th>#</th><th>Test</th><th>Pass criterion</th><th>Catches</th></tr>
+<tr><td>1a</td><td>Binary head-on collision</td><td>e<sub>n</sub> within 2 % of input</td><td>damping, time step</td></tr>
+<tr><td>1b</td><td>Gravity settling, no gas</td><td>KE decays monotonically to &lt; 10⁻⁵ J</td><td>sign errors in any force</td></tr>
+<tr><td>2a</td><td>β algebra</td><td>β·u ≡ Ergun ΔP/L</td><td>superficial/interstitial mix-ups</td></tr>
+<tr><td>2b</td><td>Frozen lattice aligned with cells</td><td>ΣF<sub>d</sub>/(W d<sub>p</sub> L) = Ergun</td><td>voidage bookkeeping</td></tr>
+<tr><td>3</td><td>Fluidized plateau</td><td>mean ΔP within 10 % of bed weight</td><td>drag summation, mass</td></tr>
+<tr><td>4a–d</td><td>Volume-flux coupling</td><td>at rest ≡ one-way to 10⁻¹²; flux and force to 10⁻⁹</td><td>q<sub>s</sub> bookkeeping, slip sign</td></tr>
+</table>
+
+<h3>3.7 How each quantity is measured</h3>
+<table>
+<tr><th>Quantity</th><th>Procedure</th></tr>
+<tr><td>u<sub>mf</sub></td><td>Descending branch of the ramp only. Fixed-bed part fitted with aU + bU² (Ergun form),
+plateau with a constant; u<sub>mf</sub> is the intersection. Repeated on 14 beds per variant; variants compared
+with paired t-tests on the same beds.</td></tr>
+<tr><td>Pressure drop</td><td>ΣF<sub>d</sub>/(W d<sub>p</sub>) at 50 Hz; mean and SD over 5–15 s, divided by the bed
+weight.</td></tr>
+<tr><td>Spectrum</td><td>Welch PSD of the ΔP signal (256-sample segments, 0.2 Hz resolution); peak frequency.</td></tr>
+<tr><td>Flow structure</td><td>Voidage field and particle positions at t = 14.5 s, the paper's Fig. 5 time.</td></tr>
+<tr><td>Momentum residual</td><td>Per cell, the drag that a row-uniform pressure gradient cannot balance (§4.4),
+time-averaged over 5–15 s.</td></tr>
+</table>
+
+<h2>4. What we found</h2>
+<table>
+<tr><th>Quantity</th><th>This work vs reference</th><th>Verdict</th></tr>
+<tr><td>u<sub>mf</sub></td><td>0.990 ± 0.009 m/s (quasi-two-way), 0.991 ± 0.008 (one-way) vs 1.00 paper, 1.05
+experiment</td><td class="ok">Good (−1 %, −6 %)</td></tr>
+<tr><td>Plateau ΔP</td><td>98.1 % of bed weight in the ramps</td><td class="ok">Good</td></tr>
+<tr><td>ΔP–U<sub>g</sub> shape</td><td>No overshoot (paper ≈ 1130 Pa at 0.8 m/s); ≈ 10 Pa hysteresis vs ≈ 100 Pa;
+fixed-bed ΔP rises later (0.31 vs ≈ 0.51 of weight at 0.5 m/s)</td><td class="mid">Partial</td></tr>
+<tr><td>Coupling effect on u<sub>mf</sub></td><td>Quasi-two-way − one-way = −0.2 % (95 % CI −0.9 to +0.5 %, p = 0.55)</td><td>None detectable</td></tr>
+<tr><td>Update ratio 1 : 1 – 10 : 1</td><td>All differences &lt; 0.6 %, p ≥ 0.29</td><td>None detectable</td></tr>
+<tr><td>Mean ΔP at 1, 2 u<sub>mf</sub></td><td>0.97 and 0.99 × weight vs paper 0.94 × at 2 u<sub>mf</sub></td><td class="ok">Good</td></tr>
+<tr><td>ΔP fluctuations, 2 u<sub>mf</sub></td><td>SD 39 / 28 Pa vs swings of 500–1800 Pa in the paper</td><td class="no">Far too small</td></tr>
+<tr><td>Dominant frequency</td><td>4.3 Hz one-way (paper 2–5 Hz); 1.2 Hz quasi-two-way</td><td class="mid">One-way only</td></tr>
+<tr><td>Flow structure, 2 u<sub>mf</sub></td><td>Dense base, solids rising at the walls round one large central void;
+paper has discrete bubbles</td><td class="no">Wrong</td></tr>
+<tr><td>3 and 4 u<sub>mf</sub></td><td>Bed lifts as a plug to the ceiling; ΔP = 6.2 / 5.8 × and 12.2 / 12.3 × weight vs
+0.93 and 0.85 ×</td><td class="no">Invalid state</td></tr>
+<tr><td>Gas momentum balance</td><td>Mean residual 0.60 of the bed weight per volume inside the bed, up to 1.5; zero in
+the paper by construction</td><td class="no">Not conserved</td></tr>
+</table>
+
+<h3>4.1 Minimum fluidization velocity</h3>
+<figure><img src="figs/fig3_ramp.png" style="width:78%">
+<figcaption>Figure 3. Bed pressure drop through the up and down ramps, mean of 14 beds for each coupling. The two
+couplings are indistinguishable in the fixed bed because nothing moves there. The grey curve is Ergun for the
+settled bed at its measured voidage.</figcaption></figure>
+<p>The pressure drop rises as the gas squeezes through the packed bed, levels off at the bed weight once the bed is
+supported, and stays there. Read from the descending branch as in the paper, u<sub>mf</sub> is 0.990 m/s for the
+quasi-two-way model and 0.991 m/s for one-way, 1 % below the paper's simulation and 6 % below the experiment. The
+bed-to-bed standard deviation is about 0.01 m/s, so 14 beds pin the mean to ±0.005 m/s.</p>
+<p>Two features of the paper's curve are missing. There is no overshoot on the way up, probably because our bed has
+no front and back walls for particles to wedge against and no rotation to lock neighbours together. The hysteresis
+is ten times smaller, which fits a bed with little to unlock. Our u<sub>mf</sub> also sits 11 % below Ergun at the
+bed's own voidage, because the simulated curve runs above Ergun before u<sub>mf</sub>. A likely cause is that drag is
+summed over cells whose voidage varies around the mean, and β rises steeply in the denser cells; we did not test
+this.</p>
+<figure><img src="figs/fig4_umf_beds.png" style="width:90%">
+<figcaption>Figure 4. u<sub>mf</sub> for every bed and variant (dots), with mean ± SD (diamonds). The coupling and the
+fluid : DEM update ratio change nothing measurable. Interpolating the voidage with cloud-in-cell weights (an
+extension whose code is not part of the repository) raises u<sub>mf</sub> by 4–5 %, more than the scatter.</figcaption></figure>
+<p>Figure 4 is the clearest result of the project. Neither the coupling nor the update ratio matters for
+u<sub>mf</sub>; the way voidage is computed does. That is a warning against reading agreement with experiment as
+validation: the interpolated variants land within 1 % of the experiment, but only because one discretisation choice
+happens to move the answer that way.</p>
+
+<h3>4.2 Holding at 1 and 2 u<sub>mf</sub></h3>
+<figure><img src="figs/fig5_dP_levels.png">
+<figcaption>Figure 5. Left: mean pressure drop over 5–15 s as a fraction of the bed weight (log scale; SD bars are
+smaller than the markers). Right: power spectrum of ΔP at 2 u<sub>mf</sub>, with the paper's dominant band
+shaded.</figcaption></figure>
+<p>At 1 and 2 u<sub>mf</sub> the mean pressure drop is 0.97 and 0.99 times the bed weight, which is the correct
+answer for a fully supported bed. The paper's values fall below the weight as velocity rises (0.94, 0.93, 0.85), which its
+authors tentatively link to gas bypassing the bed in large bubbles, something our model cannot do. The fluctuations, however, are an order of magnitude too
+small: a standard deviation of 30–40 Pa against swings of hundreds of pascals in the paper. In the paper those swings
+come from bubbles forming and erupting. The one-way spectrum still peaks at 4.3 Hz, inside the paper's band, so some
+bed-scale oscillation of the right period exists; in the quasi-two-way run the solids-flux feedback damps it and the
+peak moves to 1.2 Hz.</p>
+
+<h3>4.3 Flow structure, and the plug at 3 and 4 u<sub>mf</sub></h3>
+<figure><img src="figs/fig6_snapshots.png" style="width:92%">
+<figcaption>Figure 6. Voidage at t = 14.5 s. At 2 u<sub>mf</sub> the bed is fluidized but organised as one large
+central void with solids rising along the walls. At 4 u<sub>mf</sub> the whole bed is packed against the ceiling
+(the dense band at the top) with nearly empty space beneath.</figcaption></figure>
+<p>At 2 u<sub>mf</sub> the bed fluidizes: a dense layer sits on the distributor, solids travel up along both walls,
+and the centre is dilute. The paper shows something different, discrete bubbles that form near the distributor,
+grow and rise through a dense emulsion. Our bed has no emulsion with bubbles in it. At 3 and 4 u<sub>mf</sub> it is
+worse: within two seconds the bed is carried to the top of the domain as a single packed plug and pressed against
+the ceiling, and the "pressure drop" climbs to 6 and 12 times the bed weight. Both couplings do the same.</p>
+<div class="box"><b>Check (own calculation).</b> If all the gas has to pass through the bed packed at ε = 0.44,
+Ergun over 0.146 m gives 7,160 Pa at 3.28 m/s and 12,570 Pa at 4.38 m/s. The measured 5,240–5,570 and
+11,040–11,130 Pa are 73–88 % of that. The gas is being forced through a packed plug, and the ceiling, not gravity,
+is what holds the plug back.</div>
+
+<h3>4.4 Gas momentum is not conserved</h3>
+<p>The paper's gas momentum equation gives each cell its own pressure gradient, so the drag in every cell is
+balanced locally. Our models have no pressure field. The most generous reading is a single vertical pressure gradient
+per row, which spreads the row's drag over its cells in proportion to their gas fraction. The residual is what that
+leaves unbalanced:</p>
+<div class="eq">$$ R_{\text{cell}} = f_{d,\text{cell}} - \varepsilon_{\text{cell}}\,\frac{\sum_{\text{row}} f_d}{\sum_{\text{row}}
+\varepsilon},\qquad \text{reported as } |R|\,/\,[(1-\varepsilon_{mf})\rho_p g] $$</div>
+<figure><img src="figs/fig7_residual.png" style="width:52%">
+<figcaption>Figure 7. Time-mean residual at 2 u<sub>mf</sub>. Inside the bed (time-mean ε<sub>g</sub> &lt; 0.8) it
+averages 0.60 of the local bed weight in both couplings, peaking at 1.5 along the walls and at the
+distributor.</figcaption></figure>
+<p>Inside the bed, drag equal to 60 % of the local bed weight is not balanced by any pressure gradient. The largest
+residuals are in the dense regions: the wall streams and the layer on the distributor. In the paper those regions
+would raise the local gas pressure and push gas sideways into the dilute centre; that sideways flow is what lets
+bubbles form and gas bypass the bed. Here it cannot happen, which ties together the failures in §4.2 and §4.3.</p>
+
+<h2>5. What it shows</h2>
+<ul>
+<li><b>Force balance versus flow.</b> u<sub>mf</sub>, the plateau, and the mean ΔP at low velocity depend only on
+the drag on a bed that is just supported, which a 1-D gas captures. Bubbles, fluctuations and bypass depend on how
+gas is distributed across the bed, which needs the gas momentum equation. The split is sharp: we match the first
+group to about 1 % and miss the second entirely.</li>
+<li><b>Quasi-two-way coupling is not two-way coupling.</b> Adding the solids flux to the gas velocity conserves gas
+volume row by row but not momentum, and it changes u<sub>mf</sub> by −0.2 % (not significant). In a batch bed, solids
+going up and down in the same row largely cancel in q<sub>s</sub>.</li>
+<li><b>Scatter needs to be measured.</b> One bed gives u<sub>mf</sub> to about ±1 %. Any claim smaller than that
+needs several beds; with 14 we could show that update ratio and coupling do not matter and that voidage
+interpolation does.</li>
+<li><b>Agreement with experiment is not validation.</b> The variant closest to experiment (interpolated voidage) is
+not the more physical one; the 2-D packing and the 1-D gas both shift u<sub>mf</sub> by similar amounts.</li>
+</ul>
+
+<h2>6. Reading it critically</h2>
+<ul>
+<li><b>2-D monolayer.</b> No front or back walls, looser packing (ε<sub>mf</sub> ≈ 0.44 vs 0.42), and 905 Pa
+instead of 1075 Pa. Since u<sub>mf</sub> ∝ ε<sup>3/2</sup> in this regime, the looser packing alone moves Ergun's
+u<sub>mf</sub> up by about 7 %.</li>
+<li><b>No rotation.</b> Particles slide but cannot roll, which removes one source of interlocking and of energy
+transfer in collisions. A tangential history spring is needed before rotation can be integrated stably.</li>
+<li><b>Time step.</b> We used t<sub>c</sub>/50 because symplectic Euler was expected to need it. Figure 2 shows that
+a single collision is already accurate at t<sub>c</sub>/8, so the choice is conservative and costs a factor of about
+six in run time; it was not tested on a full bed.</li>
+<li><b>Hard ceiling.</b> At 3 and 4 u<sub>mf</sub> the ceiling holds the plug; with a pressure outlet the bed would
+leave the domain instead. Neither is the paper's behaviour.</li>
+<li><b>Single bed for holds.</b> All 1–4 u<sub>mf</sub> statistics come from bed 7. The ramps show bed-to-bed
+scatter of about 1 %, but the fluctuation and spectrum results carry no error bars.</li>
+<li><b>Excluded bed.</b> Bed 23 was removed from all variants to keep comparisons paired, because one of its seven
+runs failed Checkpoint 3. Including it does not change any conclusion; the cause was not diagnosed.</li>
+<li><b>No experimental data.</b> We compare against the paper's simulation, not against the NETL measurements, so
+particle velocities and granular temperature were not scored.</li>
+<li><b>Gidaspow convention.</b> Our dense branch uses the standard form; the paper's Table A1 as printed differs in
+its voidage convention. That changes the dense-branch drag, and so the fixed-bed curve and the u<sub>mf</sub>
+read from it; the size of the effect was not measured.</li>
+</ul>
+
+<h2>7. The physics behind the failures</h2>
+<h3>7.1 Why a 1-D gas cannot make bubbles</h3>
+<p>A bubble exists because gas prefers the path of least resistance. Where the bed is locally dilute, the drag per
+unit gas flow is small, so the pressure field drives more gas there, which pushes particles aside and makes it more
+dilute still. That instability needs two things: a pressure field that can differ across the bed, and gas that can
+move sideways to follow it. Our rule fixes the superficial gas velocity in every cell of a row to the same value, so
+a dilute cell gets no more gas than a dense one, and the feedback never starts. What forms instead is a slower
+circulation driven by the walls.</p>
+<h3>7.2 Why the bed becomes a plug</h3>
+<p>Above u<sub>mf</sub> the excess gas in a real bed passes through as bubbles, and the emulsion stays near
+minimum-fluidization conditions (two-phase theory). With no bubbles, all the gas has to go through the particles.
+At 3 u<sub>mf</sub> the drag on a uniform bed is then several times its weight, so the whole bed accelerates upward
+together until something stops it. Our "something" is the ceiling, and the measured ΔP is the force the ceiling
+needs to apply, which the Ergun check in §4.3 confirms.</p>
+<h3>7.3 Why the volume-flux coupling barely matters near u<sub>mf</sub></h3>
+<p>Near u<sub>mf</sub> the particles barely move, so q<sub>s</sub> ≈ 0 and the two rules agree; this is built into
+the model (Checkpoint 4a). Once fluidized, q<sub>s</sub> in a row is the net of solids rising at the walls and
+falling elsewhere. In a closed batch bed those nearly cancel, so the correction to u<sub>g</sub> is small on average
+and only changes the dynamics (the 1.2 Hz peak), not the mean.</p>
+<h3>7.4 Why the update ratio does not matter</h3>
+<p>Five DEM steps are 16.6 µs. In that time a particle moving at 1 m/s travels 17 µm, about 0.2 % of a fluid cell, so
+the voidage field barely changes between updates. Even 10 : 1 is far below the time particles take to cross a cell.
+The paper's ratio comes from a gas solver's stability limit; here it only staggers a bookkeeping step.</p>
+
+<h2>8. What would fix it</h2>
+<ul>
+<li><b>Solve a 2-D gas pressure equation.</b> A porous-media (Darcy–Ergun) pressure solve per cell, with gas
+continuity, would give each cell its own ∇p and let gas move sideways. This is the smallest change that could
+produce bubbles and bypass at 3–4 u<sub>mf</sub>.</li>
+<li><b>Full CFD-DEM cross-check.</b> Run the same bed in an established CFD-DEM code (Lethe, VANS); five beds have been
+run so far.</li>
+<li><b>Rotation and a tangential spring</b>, then the ramp overshoot can be tested again.</li>
+<li><b>Experimental data.</b> Obtain the NETL SSCP measurements (Gopalan et al., 2016) to score particle velocities
+and granular temperature directly.</li>
+</ul>
+
+<h2>9. Symbols</h2>
+<table>
+<tr><th>Symbol</th><th>Meaning</th><th>Symbol</th><th>Meaning</th></tr>
+<tr><td>ε<sub>g</sub>, ε<sub>s</sub></td><td>gas, solid volume fraction</td><td>u<sub>mf</sub></td><td>minimum fluidization velocity</td></tr>
+<tr><td>U<sub>g</sub></td><td>superficial gas velocity</td><td>u<sub>g</sub>, v<sub>p</sub></td><td>interstitial gas, particle velocity</td></tr>
+<tr><td>q<sub>s</sub></td><td>row-averaged solids volume flux</td><td>β</td><td>inter-phase momentum exchange coefficient</td></tr>
+<tr><td>k<sub>n</sub>, k<sub>t</sub></td><td>normal, tangential stiffness</td><td>η<sub>n</sub>, ζ</td><td>normal damping, damping ratio</td></tr>
+<tr><td>e<sub>n</sub></td><td>normal restitution coefficient</td><td>t<sub>c</sub>, Δt</td><td>contact duration, DEM time step</td></tr>
+<tr><td>W, Δx, Δy</td><td>bed width, fluid cell size</td><td>R<sub>cell</sub></td><td>unbalanced drag per cell volume</td></tr>
+<tr><td>ΔP<sub>bed</sub></td><td>bed pressure drop, ΣF<sub>d</sub>/(W d<sub>p</sub>)</td><td>PSD</td><td>power spectral density</td></tr>
+</table>
+<p style="font-size:8.8pt;color:#5a5a5a">All figures are original, drawn from this project's run outputs by
+<code>presentation/explainer/make_figs.py</code>. Numbers marked "own calculation" come from <code>params.py</code> and
+the correlations in <code>drag.py</code>. Paper values are read from Liu &amp; van Wachem (2019).</p>
+
+<script>
+  renderMathInElement(document.body, {delimiters: [{left: "$$", right: "$$", display: true}]});
+  document.body.dataset.ready = "1";
+</script>
+</body>
+</html>
